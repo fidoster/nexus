@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -22,7 +23,25 @@ export default function Login() {
 
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+
+      // Check user's role and redirect accordingly
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        // Redirect admins to admin panel, others to dashboard
+        if (profile?.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError('Failed to sign in. Please check your credentials.');
       console.error(err);
