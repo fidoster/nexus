@@ -93,10 +93,14 @@ export default function Admin() {
     } else {
       // Default empty keys
       setAPIKeys([
-        { id: '1', service: 'OpenAI', key: '', isActive: false },
+        { id: '1', service: 'OpenAI (GPT)', key: '', isActive: false },
         { id: '2', service: 'Anthropic (Claude)', key: '', isActive: false },
         { id: '3', service: 'Google (Gemini)', key: '', isActive: false },
         { id: '4', service: 'Meta (Llama)', key: '', isActive: false },
+        { id: '5', service: 'Mistral AI', key: '', isActive: false },
+        { id: '6', service: 'Perplexity', key: '', isActive: false },
+        { id: '7', service: 'Cohere', key: '', isActive: false },
+        { id: '8', service: 'DeepSeek', key: '', isActive: false },
       ]);
     }
   };
@@ -236,6 +240,52 @@ export default function Admin() {
     a.download = `nexus-analytics-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const deleteAllEvaluations = async () => {
+    if (!confirm('⚠️ WARNING: This will permanently delete ALL queries, responses, and ratings. This action cannot be undone. Are you sure?')) {
+      return;
+    }
+
+    try {
+      // Delete in order: ratings → responses → queries (due to foreign keys)
+      const { error: ratingsError } = await supabase.from('ratings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (ratingsError) throw ratingsError;
+
+      const { error: responsesError } = await supabase.from('responses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (responsesError) throw responsesError;
+
+      const { error: queriesError } = await supabase.from('queries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (queriesError) throw queriesError;
+
+      alert('✅ All evaluation data has been deleted successfully!');
+      setAnalyticsData(null); // Clear analytics display
+    } catch (err) {
+      console.error('Error deleting evaluations:', err);
+      alert('❌ Failed to delete evaluation data. Check console for details.');
+    }
+  };
+
+  const deleteQueryAndRelated = async (queryId: string) => {
+    if (!confirm('Delete this query and all its responses/ratings?')) {
+      return;
+    }
+
+    try {
+      // Responses and ratings will cascade delete due to foreign keys
+      const { error } = await supabase
+        .from('queries')
+        .delete()
+        .eq('id', queryId);
+
+      if (error) throw error;
+
+      alert('✅ Query deleted successfully!');
+      await loadAnalytics(); // Reload data
+    } catch (err) {
+      console.error('Error deleting query:', err);
+      alert('❌ Failed to delete query.');
+    }
   };
 
   const handleSignOut = async () => {
@@ -463,15 +513,35 @@ export default function Admin() {
                   Select which AI models to use for generating responses. Models will only work if their API keys are configured.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
-                  {['GPT (OpenAI)', 'Claude (Anthropic)', 'Gemini (Google)', 'Llama (Meta)'].map((model) => (
-                    <div key={model} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
-                      <span className="font-medium">{model}</span>
+                  {[
+                    { name: 'GPT', provider: 'OpenAI', icon: '🤖' },
+                    { name: 'Claude', provider: 'Anthropic', icon: '🧠' },
+                    { name: 'Gemini', provider: 'Google', icon: '✨' },
+                    { name: 'Llama', provider: 'Meta', icon: '🦙' },
+                    { name: 'Mistral', provider: 'Mistral AI', icon: '🌪️' },
+                    { name: 'Perplexity', provider: 'Perplexity', icon: '🔍' },
+                    { name: 'Cohere', provider: 'Cohere', icon: '🌐' },
+                    { name: 'DeepSeek', provider: 'DeepSeek', icon: '🔬' }
+                  ].map((model) => (
+                    <div key={model.name} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{model.icon}</span>
+                        <div>
+                          <span className="font-semibold block">{model.name}</span>
+                          <span className="text-xs text-gray-500">{model.provider}</span>
+                        </div>
+                      </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" />
+                        <input type="checkbox" className="sr-only peer" defaultChecked={['GPT', 'Claude', 'Gemini'].includes(model.name)} />
                         <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
                     </div>
                   ))}
+                </div>
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> Currently using mock responses. Enable actual API integration by configuring API keys in the API Keys tab. You can select which models to include in evaluations.
+                  </p>
                 </div>
               </div>
             )}
@@ -560,6 +630,25 @@ export default function Admin() {
                           <div className="text-4xl">🤖</div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Data Management */}
+                    <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-6">
+                      <h4 className="text-lg font-bold text-red-900 mb-2 flex items-center gap-2">
+                        🗑️ Data Management
+                      </h4>
+                      <p className="text-sm text-red-700 mb-4">
+                        Manage evaluation data. Use caution - deletions are permanent!
+                      </p>
+                      <button
+                        onClick={deleteAllEvaluations}
+                        className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                      >
+                        🗑️ Delete All Evaluation Data
+                      </button>
+                      <p className="text-xs text-red-600 mt-2">
+                        This will delete all queries, responses, and ratings. Cannot be undone!
+                      </p>
                     </div>
 
                     {/* Model Performance Comparison */}
