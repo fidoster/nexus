@@ -26,25 +26,44 @@ export default function Login() {
 
       // Check user's role and redirect accordingly
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('User logged in:', user?.email);
+
       if (user) {
-        const { data: profile } = await supabase
+        // Add a small delay to ensure auth state is fully updated
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+
+        console.log('User ID:', user.id);
+        console.log('Profile data:', profile);
+        console.log('Profile error:', profileError);
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+          // If there's an error fetching profile, default to dashboard
+          navigate('/dashboard');
+          return;
+        }
 
         // Redirect admins to admin panel, others to dashboard
         if (profile?.role === 'admin') {
+          console.log('✅ Admin detected! Redirecting to admin panel');
           navigate('/admin');
         } else {
+          console.log('ℹ️ Redirecting to dashboard, role is:', profile?.role || 'no role found');
           navigate('/dashboard');
         }
       } else {
+        console.log('No user found, redirecting to dashboard');
         navigate('/dashboard');
       }
     } catch (err) {
       setError('Failed to sign in. Please check your credentials.');
-      console.error(err);
+      console.error('Login error:', err);
     } finally {
       setLoading(false);
     }
