@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import ThemeToggle from '../components/ThemeToggle';
 
 interface UserProfile {
   id: string;
@@ -421,22 +422,23 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm">
+      <nav className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-2xl font-bold text-red-600">Nexus Admin Panel</h1>
-            <div className="flex gap-4">
+            <h1 className="text-2xl font-bold text-red-600 dark:text-red-500">Nexus Admin Panel</h1>
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="px-4 py-2 text-gray-700 hover:text-indigo-600 transition-colors"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
               >
                 Dashboard
               </button>
+              <ThemeToggle />
               <button
                 onClick={handleSignOut}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 transition-colors"
               >
                 Sign Out
               </button>
@@ -447,23 +449,23 @@ export default function Admin() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome, Admin!</h2>
-          <p className="text-gray-600">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-8 border border-gray-200 dark:border-gray-700 transition-colors">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome, Admin!</h2>
+          <p className="text-gray-600 dark:text-gray-400">
             Manage users, configure API keys, and control platform settings.
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-sm mb-8">
-          <div className="border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm mb-8 border border-gray-200 dark:border-gray-700 transition-colors">
+          <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex -mb-px">
               <button
                 onClick={() => setActiveTab('users')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'users'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 👥 User Management
@@ -472,8 +474,8 @@ export default function Admin() {
                 onClick={() => setActiveTab('analytics')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'analytics'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 📊 Analytics & Research
@@ -482,8 +484,8 @@ export default function Admin() {
                 onClick={() => setActiveTab('api-keys')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'api-keys'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 🔑 API Keys
@@ -492,8 +494,8 @@ export default function Admin() {
                 onClick={() => setActiveTab('models')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'models'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 🤖 AI Models
@@ -502,8 +504,8 @@ export default function Admin() {
                 onClick={() => setActiveTab('settings')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === 'settings'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 ⚙️ Settings
@@ -516,7 +518,7 @@ export default function Admin() {
             {/* Users Tab */}
             {activeTab === 'users' && (
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">User Management</h3>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">User Management</h3>
                 {users.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">No users found or unable to load users.</p>
@@ -578,8 +580,8 @@ export default function Admin() {
             {/* API Keys Tab */}
             {activeTab === 'api-keys' && (
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">API Keys Configuration</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">API Keys Configuration</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Configure API keys for various AI model providers. These keys enable Nexus to fetch responses from different AI models.
                 </p>
                 <div className="space-y-6">
@@ -624,8 +626,8 @@ export default function Admin() {
             {/* AI Models Tab */}
             {activeTab === 'models' && (
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">AI Models Configuration</h3>
-                <p className="text-gray-600 mb-6">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Models Configuration</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
                   Select which AI models to use for generating responses. Models will only work if their API keys are configured.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
@@ -750,7 +752,7 @@ export default function Admin() {
 
 
                     {/* Model Performance Comparison */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
                       <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
                         🏆 Model Performance Rankings
                         <span className="text-sm font-normal text-gray-500">(Lower average rank = Better performance)</span>
@@ -794,7 +796,7 @@ export default function Admin() {
                     </div>
 
                     {/* Detailed Student Responses Table */}
-                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h4 className="text-lg font-bold text-gray-900">📋 Detailed Evaluation Records</h4>
                         <div className="flex items-center gap-2">
@@ -936,7 +938,7 @@ export default function Admin() {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Platform Settings</h3>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Platform Settings</h3>
                 <div className="space-y-6">
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h4 className="font-semibold mb-2">Maximum Responses per Query</h4>
