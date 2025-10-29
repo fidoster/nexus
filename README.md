@@ -1,117 +1,192 @@
-# Nexus - LLM Evaluation Platform
+# Nexus - AI Model Evaluation Platform
 
-An educational platform where students submit queries and rate anonymous responses from multiple AI models.
+> **Blind evaluation platform for comparing AI model responses in educational settings**
 
-## Tech Stack
+Nexus is an educational research platform that allows students to anonymously evaluate and rank responses from multiple AI models (GPT, Claude, Gemini), enabling unbiased assessment of AI performance.
 
-- **Frontend**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **Routing**: React Router DOM
-- **Backend/Auth**: Supabase
-- **Deployment**: Vercel
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## Features
+## 🎯 Features
 
-- User authentication (sign up, login, logout)
-- Submit queries to multiple AI models
-- Rate anonymous AI responses
-- Compare model performance
-- View query and rating history
+### For Students
+- 💬 **Submit Questions**: Ask any question to multiple AI models
+- 🔍 **Anonymous Evaluation**: Responses shown as "Model A", "Model B", "Model C"
+- 🏆 **Rank Responses**: Rate each response (1st Best, 2nd Best, 3rd Best)
+- 📜 **View History**: Access previous queries and evaluations
+- 🌓 **Dark Mode**: Full dark/light theme support
 
-## Getting Started
+### For Admins
+- 👥 **User Management**: Manage student and instructor accounts
+- 📊 **Comprehensive Analytics**: View detailed performance metrics
+- 🏆 **Model Performance Rankings**: See which AI models perform best
+- 📥 **Export Data**: Download evaluation data as CSV for research
+- 🔑 **API Configuration**: Manage AI provider API keys
+- ⚙️ **Platform Settings**: Configure evaluation parameters
+
+## 🚀 Tech Stack
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: Tailwind CSS v3 with dark mode
+- **Routing**: React Router DOM v6
+- **Backend**: Supabase (PostgreSQL + Auth)
+- **Deployment**: Vercel-ready
+
+## 📚 Documentation
+
+### Getting Started
+- **[Setup Instructions](docs/SETUP_INSTRUCTIONS.md)** - Complete setup guide
+- **[Blind Evaluation System](docs/BLIND_EVALUATION_SYSTEM.md)** - How anonymous evaluation works
+
+### Admin & Research
+- **[Analytics Features](docs/ANALYTICS_FEATURES.md)** - Research capabilities and data export
+- **[Admin Queries](database/ADMIN_QUERIES.md)** - SQL queries for analysis
+
+### Database
+- **[Database Setup](database/SUPABASE_SETUP.md)** - Initial database configuration
+- **[Update Response Policy](database/UPDATE_RESPONSE_POLICY.sql)** - Required RLS policy update
+
+## ⚡ Quick Start
 
 ### Prerequisites
-
 - Node.js 18+ and npm
 - Supabase account
 
 ### Installation
 
-1. Clone the repository:
-```bash
-git clone <your-repo-url>
-cd nexus
-```
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/nexus.git
+   cd nexus
+   ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-3. Set up environment variables:
-   - Copy `.env.example` to `.env`
-   - Add your Supabase credentials:
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+3. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Add your Supabase credentials
+   ```
 
-4. Run the development server:
-```bash
-npm run dev
-```
+4. **Setup database**
+   - Follow [database/SUPABASE_SETUP.md](database/SUPABASE_SETUP.md)
+   - Run SQL scripts in Supabase SQL Editor
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser
+5. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-## Project Structure
+6. **Open in browser**
+   ```
+   http://localhost:5174
+   ```
+
+## 🏗️ Project Structure
 
 ```
 nexus/
 ├── src/
-│   ├── components/      # Reusable UI components
-│   │   └── ProtectedRoute.tsx
-│   ├── contexts/        # React contexts (Auth, etc.)
-│   │   └── AuthContext.tsx
-│   ├── hooks/          # Custom React hooks
-│   ├── lib/            # Third-party library configs
-│   │   └── supabase.ts
-│   ├── pages/          # Page components
-│   │   ├── Home.tsx
-│   │   ├── Login.tsx
-│   │   ├── SignUp.tsx
-│   │   └── Dashboard.tsx
-│   ├── types/          # TypeScript type definitions
-│   │   └── index.ts
-│   ├── utils/          # Utility functions
-│   ├── App.tsx         # Main app component
-│   ├── main.tsx        # App entry point
-│   └── index.css       # Global styles
-├── public/             # Static assets
-└── ...config files
+│   ├── components/          # React components
+│   │   ├── ThemeToggle.tsx  # Dark mode toggle
+│   │   └── ...
+│   ├── contexts/            # React contexts
+│   │   ├── AuthContext.tsx  # Authentication
+│   │   └── ThemeContext.tsx # Theme management
+│   ├── pages/               # Main pages
+│   │   ├── Dashboard.tsx    # Student dashboard
+│   │   ├── Admin.tsx        # Admin panel with analytics
+│   │   ├── Login.tsx        # Login page
+│   │   └── ...
+│   ├── lib/                 # Utilities
+│   │   └── supabase.ts      # Supabase client
+│   └── types/               # TypeScript types
+├── database/                # Database setup files
+│   ├── SUPABASE_SETUP.md    # Setup instructions
+│   ├── ADMIN_QUERIES.md     # Analytics queries
+│   └── *.sql                # SQL scripts
+├── docs/                    # Documentation
+│   ├── BLIND_EVALUATION_SYSTEM.md
+│   ├── SETUP_INSTRUCTIONS.md
+│   └── ANALYTICS_FEATURES.md
+└── public/                  # Static assets
 ```
 
-## Available Scripts
+## 🎓 How It Works
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+### Blind Evaluation Process
 
-## Supabase Setup
+1. **Student submits query** → Saved to database
+2. **AI models generate responses** → Stored with actual model names (GPT, Claude, Gemini)
+3. **Responses randomized** → Displayed as "Model A", "Model B", "Model C"
+4. **Student ranks responses** → Rankings saved with actual model IDs
+5. **Admin views analytics** → See which model got which rank
 
-You'll need to set up the following tables in Supabase:
+This ensures **unbiased evaluation** while maintaining full data for research analysis.
 
-1. **users** - Extended user profile data
-2. **queries** - Student-submitted queries
-3. **responses** - AI model responses to queries
-4. **ratings** - Student ratings of responses
+## 📊 Analytics Dashboard
 
-Refer to the database schema documentation for detailed table structures.
+The admin analytics dashboard provides:
 
-## Deployment
+- **Total Evaluations**: Count of student rankings
+- **Active Students**: Number of participating students
+- **Model Performance**: Average rankings by model
+- **Detailed Records**: Complete evaluation history
+- **CSV Export**: Download data for statistical analysis
 
-This project is configured for deployment on Vercel:
+Perfect for educational research on AI model performance!
 
-1. Push your code to GitHub
-2. Import the repository in Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy!
+## 🔐 User Roles
 
-## Contributing
+- **Student**: Submit queries, rank responses, view history
+- **Instructor**: (Future) View class analytics
+- **Admin**: Full access to analytics, user management, settings
 
-This is an educational project. Contributions and suggestions are welcome!
+## 🎨 UI Features
 
-## License
+- ✅ ChatGPT-style interface
+- ✅ Dark/Light mode with smooth transitions
+- ✅ Fully responsive design
+- ✅ Color-coded ranking system (Gold/Cyan/Orange)
+- ✅ Real-time data updates
+- ✅ Accessible and keyboard-friendly
 
-MIT
+## 🛠️ Development
+
+### Build for production
+```bash
+npm run build
+```
+
+### Preview production build
+```bash
+npm run preview
+```
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+1. Push to GitHub
+2. Import project in Vercel
+3. Add environment variables
+4. Deploy
+
+### Other Platforms
+- Netlify
+- Railway
+- Render
+
+## 🤝 Contributing
+
+Contributions welcome! This is an educational research project.
+
+## 📝 License
+
+MIT License
+
+---
+
+**Made with ❤️ for educational research**

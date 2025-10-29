@@ -17,7 +17,7 @@ interface APIKey {
   isActive: boolean;
 }
 
-type TabType = 'users' | 'api-keys' | 'settings' | 'models';
+type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics';
 
 export default function Admin() {
   const { user, signOut } = useAuth();
@@ -26,6 +26,8 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [apiKeys, setAPIKeys] = useState<APIKey[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -125,6 +127,97 @@ export default function Admin() {
     }
   };
 
+  const loadAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      // Fetch comprehensive analytics data
+      const { data: allRatings, error: ratingsError } = await supabase
+        .from('ratings')
+        .select(`
+          *,
+          response:responses(
+            id,
+            model_name,
+            content,
+            query:queries(
+              id,
+              content,
+              user:profiles(email)
+            )
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (ratingsError) throw ratingsError;
+
+      // Calculate model performance statistics
+      const modelStats: any = {};
+      allRatings?.forEach((rating: any) => {
+        const modelName = rating.response?.model_name;
+        if (!modelName) return;
+
+        if (!modelStats[modelName]) {
+          modelStats[modelName] = {
+            name: modelName,
+            rankings: { 1: 0, 2: 0, 3: 0 },
+            totalRatings: 0,
+            averageRank: 0
+          };
+        }
+
+        modelStats[modelName].rankings[rating.score]++;
+        modelStats[modelName].totalRatings++;
+      });
+
+      // Calculate average rankings
+      Object.keys(modelStats).forEach(model => {
+        const stats = modelStats[model];
+        const weightedSum = stats.rankings[1] * 1 + stats.rankings[2] * 2 + stats.rankings[3] * 3;
+        stats.averageRank = stats.totalRatings > 0 ? (weightedSum / stats.totalRatings).toFixed(2) : 0;
+      });
+
+      setAnalyticsData({
+        allRatings,
+        modelStats,
+        totalEvaluations: allRatings?.length || 0
+      });
+    } catch (err) {
+      console.error('Error loading analytics:', err);
+      alert('Failed to load analytics data');
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  const exportToCSV = () => {
+    if (!analyticsData?.allRatings) return;
+
+    const csvRows = [
+      ['Student Email', 'Question', 'Model', 'Rank', 'Response Preview', 'Rated At'].join(',')
+    ];
+
+    analyticsData.allRatings.forEach((rating: any) => {
+      const row = [
+        rating.response?.query?.user?.email || 'N/A',
+        `"${rating.response?.query?.content?.replace(/"/g, '""') || 'N/A'}"`,
+        rating.response?.model_name || 'N/A',
+        rating.score,
+        `"${rating.response?.content?.substring(0, 50).replace(/"/g, '""') || 'N/A'}..."`,
+        new Date(rating.created_at).toLocaleString()
+      ].join(',');
+      csvRows.push(row);
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexus-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
@@ -188,6 +281,16 @@ export default function Admin() {
                 }`}
               >
                 👥 User Management
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'analytics'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📊 Analytics & Research
               </button>
               <button
                 onClick={() => setActiveTab('api-keys')}
@@ -350,6 +453,196 @@ export default function Admin() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Analytics & Research Data</h3>
+                    <p className="text-gray-600 mt-1">Comprehensive insights into student evaluations and AI model performance</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={loadAnalytics}
+                      disabled={loadingAnalytics}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 transition-colors flex items-center gap-2"
+                    >
+                      {loadingAnalytics ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Loading...
+                        </>
+                      ) : (
+                        <>
+                          🔄 Refresh Data
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={exportToCSV}
+                      disabled={!analyticsData}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors flex items-center gap-2"
+                    >
+                      📥 Export CSV
+                    </button>
+                  </div>
+                </div>
+
+                {!analyticsData ? (
+                  <div className="text-center py-12 bg-gray-50 rounded-xl">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">No Analytics Data Loaded</h4>
+                    <p className="text-gray-600 mb-4">Click "Refresh Data" to load analytics</p>
+                    <button
+                      onClick={loadAnalytics}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    >
+                      Load Analytics
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Summary Cards */}
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-blue-600">Total Evaluations</p>
+                            <p className="text-3xl font-bold text-blue-900 mt-1">{analyticsData.totalEvaluations}</p>
+                          </div>
+                          <div className="text-4xl">📊</div>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-green-600">Active Students</p>
+                            <p className="text-3xl font-bold text-green-900 mt-1">
+                              {new Set(analyticsData.allRatings?.map((r: any) => r.user_id)).size}
+                            </p>
+                          </div>
+                          <div className="text-4xl">👥</div>
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border border-purple-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-purple-600">Models Tested</p>
+                            <p className="text-3xl font-bold text-purple-900 mt-1">
+                              {Object.keys(analyticsData.modelStats).length}
+                            </p>
+                          </div>
+                          <div className="text-4xl">🤖</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Model Performance Comparison */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        🏆 Model Performance Rankings
+                        <span className="text-sm font-normal text-gray-500">(Lower average rank = Better performance)</span>
+                      </h4>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {Object.values(analyticsData.modelStats)
+                          .sort((a: any, b: any) => parseFloat(a.averageRank) - parseFloat(b.averageRank))
+                          .map((model: any, index: number) => (
+                            <div key={model.name} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-3">
+                                <h5 className="font-semibold text-gray-900">{model.name}</h5>
+                                {index === 0 && <span className="text-2xl">🥇</span>}
+                                {index === 1 && <span className="text-2xl">🥈</span>}
+                                {index === 2 && <span className="text-2xl">🥉</span>}
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Average Rank:</span>
+                                  <span className="font-bold text-indigo-600">{model.averageRank}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-yellow-600">🥇 1st Place:</span>
+                                  <span className="font-semibold">{model.rankings[1]}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-cyan-600">🥈 2nd Place:</span>
+                                  <span className="font-semibold">{model.rankings[2]}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-orange-600">🥉 3rd Place:</span>
+                                  <span className="font-semibold">{model.rankings[3]}</span>
+                                </div>
+                                <div className="pt-2 border-t border-gray-200 flex justify-between text-sm">
+                                  <span className="text-gray-600">Total Ratings:</span>
+                                  <span className="font-bold">{model.totalRatings}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Detailed Student Responses Table */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-6">
+                      <h4 className="text-lg font-bold text-gray-900 mb-4">📋 Detailed Evaluation Records</h4>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response Preview</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {analyticsData.allRatings?.slice(0, 50).map((rating: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {rating.response?.query?.user?.email?.split('@')[0] || 'N/A'}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                                  {rating.response?.query?.content || 'N/A'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className="px-2 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800 rounded">
+                                    {rating.response?.model_name || 'N/A'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`px-2 py-1 text-xs font-semibold rounded ${
+                                    rating.score === 1 ? 'bg-yellow-100 text-yellow-800' :
+                                    rating.score === 2 ? 'bg-cyan-100 text-cyan-800' :
+                                    'bg-orange-100 text-orange-800'
+                                  }`}>
+                                    {rating.score === 1 ? '🥇 1st' : rating.score === 2 ? '🥈 2nd' : '🥉 3rd'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                                  {rating.response?.content?.substring(0, 50) || 'N/A'}...
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                                  {new Date(rating.created_at).toLocaleDateString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {analyticsData.allRatings?.length > 50 && (
+                        <p className="text-sm text-gray-500 mt-4 text-center">
+                          Showing first 50 of {analyticsData.allRatings.length} evaluations. Export CSV for complete data.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
