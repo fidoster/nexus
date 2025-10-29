@@ -3,13 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+type TabType = 'submit' | 'rate' | 'history';
+
+interface Query {
+  id: string;
+  content: string;
+  status: string;
+  created_at: string;
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('submit');
+  const [queryText, setQueryText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [myQueries, setMyQueries] = useState<Query[]>([]);
 
   useEffect(() => {
     checkAdminStatus();
+    loadMyQueries();
   }, [user]);
 
   const checkAdminStatus = async () => {
@@ -19,9 +33,53 @@ export default function Dashboard() {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     setIsAdmin(profile?.role === 'admin');
+  };
+
+  const loadMyQueries = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('queries')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setMyQueries(data);
+    }
+  };
+
+  const handleSubmitQuery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !queryText.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('queries')
+        .insert([
+          {
+            user_id: user.id,
+            content: queryText.trim(),
+            status: 'pending'
+          }
+        ]);
+
+      if (error) throw error;
+
+      setQueryText('');
+      loadMyQueries();
+      setActiveTab('history');
+      alert('Query submitted successfully! AI responses will be generated shortly.');
+    } catch (err) {
+      console.error('Error submitting query:', err);
+      alert('Failed to submit query. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -34,7 +92,7 @@ export default function Dashboard() {
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <h1 className="text-2xl font-bold text-indigo-600">Nexus Dashboard</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">Nexus</h1>
             <div className="flex gap-3">
               {isAdmin && (
                 <button
@@ -59,47 +117,170 @@ export default function Dashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Welcome to your Dashboard
+            Welcome, {user?.email?.split('@')[0]}!
           </h2>
           <p className="text-gray-600">
-            Logged in as: <span className="font-semibold">{user?.email}</span>
+            Submit queries, rate AI responses, and explore different models' capabilities.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-4">📝</div>
-            <h3 className="text-xl font-semibold mb-2">Submit Query</h3>
-            <p className="text-gray-600 mb-4">
-              Submit a new query to get responses from multiple AI models.
-            </p>
-            <button className="text-indigo-600 hover:text-indigo-700 font-semibold">
-              Coming soon →
-            </button>
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-sm mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="flex -mb-px">
+              <button
+                onClick={() => setActiveTab('submit')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'submit'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📝 Submit Query
+              </button>
+              <button
+                onClick={() => setActiveTab('rate')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'rate'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                ⭐ Rate Responses
+              </button>
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'history'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📊 My History
+              </button>
+            </nav>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-4">⭐</div>
-            <h3 className="text-xl font-semibold mb-2">Rate Responses</h3>
-            <p className="text-gray-600 mb-4">
-              View and rate anonymous responses from AI models.
-            </p>
-            <button className="text-indigo-600 hover:text-indigo-700 font-semibold">
-              Coming soon →
-            </button>
-          </div>
+          {/* Tab Content */}
+          <div className="p-6">
+            {/* Submit Query Tab */}
+            {activeTab === 'submit' && (
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Submit a New Query</h3>
+                <p className="text-gray-600 mb-6">
+                  Ask a question and receive responses from multiple AI models. All responses will be anonymous - you won't know which model generated which response.
+                </p>
+                <form onSubmit={handleSubmitQuery} className="space-y-4">
+                  <div>
+                    <label htmlFor="query" className="block text-sm font-medium text-gray-700 mb-2">
+                      Your Question
+                    </label>
+                    <textarea
+                      id="query"
+                      value={queryText}
+                      onChange={(e) => setQueryText(e.target.value)}
+                      rows={6}
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                      placeholder="e.g., Explain quantum computing in simple terms..."
+                    />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="submit"
+                      disabled={submitting || !queryText.trim()}
+                      className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Query'}
+                    </button>
+                    {queryText.trim() && (
+                      <span className="text-sm text-gray-500">
+                        {queryText.trim().split(/\s+/).length} words
+                      </span>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
 
-          <div className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
-            <div className="text-3xl mb-4">📊</div>
-            <h3 className="text-xl font-semibold mb-2">My History</h3>
-            <p className="text-gray-600 mb-4">
-              View your query history and ratings you've submitted.
-            </p>
-            <button className="text-indigo-600 hover:text-indigo-700 font-semibold">
-              Coming soon →
-            </button>
+            {/* Rate Responses Tab */}
+            {activeTab === 'rate' && (
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Rate AI Responses</h3>
+                <p className="text-gray-600 mb-6">
+                  View and rate responses from AI models. Help improve the evaluation by providing honest ratings.
+                </p>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+                  <div className="text-6xl mb-4">⭐</div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2">No Responses to Rate Yet</h4>
+                  <p className="text-gray-600">
+                    Submit a query first, and you'll be able to rate the AI responses here once they're generated.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('submit')}
+                    className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                  >
+                    Submit Your First Query
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* History Tab */}
+            {activeTab === 'history' && (
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">My Query History</h3>
+                <p className="text-gray-600 mb-6">
+                  View all your submitted queries and their status.
+                </p>
+                {myQueries.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+                    <div className="text-6xl mb-4">📊</div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">No Queries Yet</h4>
+                    <p className="text-gray-600">
+                      You haven't submitted any queries yet. Start by submitting your first question!
+                    </p>
+                    <button
+                      onClick={() => setActiveTab('submit')}
+                      className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    >
+                      Submit Your First Query
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {myQueries.map((query) => (
+                      <div key={query.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-2">
+                          <p className="text-gray-900 flex-1">{query.content}</p>
+                          <span className={`ml-4 px-3 py-1 text-xs font-semibold rounded-full ${
+                            query.status === 'completed'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {query.status === 'completed' ? 'Completed' : 'Pending'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-gray-500">
+                          <span>{new Date(query.created_at).toLocaleString()}</span>
+                          {query.status === 'completed' && (
+                            <button
+                              onClick={() => setActiveTab('rate')}
+                              className="text-indigo-600 hover:text-indigo-700 font-semibold"
+                            >
+                              View Responses →
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </main>
