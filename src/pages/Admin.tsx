@@ -41,12 +41,12 @@ export default function Admin() {
         setUserProfile(data);
         loadAllUsers();
       } else {
-        // Not an admin, redirect to dashboard
-        navigate('/dashboard');
+        // Not an admin, redirect to access denied page
+        navigate('/access-denied', { replace: true });
       }
     } catch (err) {
       console.error('Error checking admin access:', err);
-      navigate('/dashboard');
+      navigate('/access-denied', { replace: true });
     } finally {
       setLoading(false);
     }
