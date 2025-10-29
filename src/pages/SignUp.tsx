@@ -8,6 +8,7 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function SignUp() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -30,7 +32,11 @@ export default function SignUp() {
 
     try {
       await signUp(email, password);
-      navigate('/dashboard');
+      setSuccess('Account created! Please check your email to confirm your account. If you don\'t receive an email, check your spam folder or contact support.');
+      // Don't navigate immediately - let user see the confirmation message
+      setTimeout(() => {
+        navigate('/login');
+      }, 5000);
     } catch (err) {
       setError('Failed to create account. Please try again.');
       console.error(err);
@@ -50,6 +56,21 @@ export default function SignUp() {
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg text-sm">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+              </svg>
+              <div>
+                <p className="font-semibold mb-1">Success!</p>
+                <p>{success}</p>
+                <p className="mt-2 text-xs">Redirecting to login in 5 seconds...</p>
+              </div>
+            </div>
           </div>
         )}
 
