@@ -28,6 +28,8 @@ export default function Admin() {
   const [apiKeys, setAPIKeys] = useState<APIKey[]>([]);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [selectedRatings, setSelectedRatings] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
 
   useEffect(() => {
     checkAdminAccess();
@@ -242,6 +244,73 @@ export default function Admin() {
     window.URL.revokeObjectURL(url);
   };
 
+  const toggleSelectRating = (ratingId: string) => {
+    const newSelected = new Set(selectedRatings);
+    if (newSelected.has(ratingId)) {
+      newSelected.delete(ratingId);
+    } else {
+      newSelected.add(ratingId);
+    }
+    setSelectedRatings(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedRatings.size === analyticsData?.allRatings?.length) {
+      setSelectedRatings(new Set());
+    } else {
+      const allIds = new Set(analyticsData?.allRatings?.map((r: any) => r.id));
+      setSelectedRatings(allIds);
+    }
+  };
+
+  const deleteSelectedRatings = async () => {
+    if (selectedRatings.size === 0) {
+      alert('Please select at least one evaluation to delete.');
+      return;
+    }
+
+    if (!confirm(`Delete ${selectedRatings.size} selected evaluation(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ratings')
+        .delete()
+        .in('id', Array.from(selectedRatings));
+
+      if (error) throw error;
+
+      alert(`✅ Deleted ${selectedRatings.size} evaluation(s) successfully!`);
+      setSelectedRatings(new Set());
+      await loadAnalytics();
+    } catch (err) {
+      console.error('Error deleting ratings:', err);
+      alert('❌ Failed to delete evaluations.');
+    }
+  };
+
+  const deleteRating = async (ratingId: string) => {
+    if (!confirm('Delete this evaluation? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('ratings')
+        .delete()
+        .eq('id', ratingId);
+
+      if (error) throw error;
+
+      alert('✅ Evaluation deleted successfully!');
+      await loadAnalytics();
+    } catch (err) {
+      console.error('Error deleting rating:', err);
+      alert('❌ Failed to delete evaluation.');
+    }
+  };
+
   const deleteAllEvaluations = async () => {
     if (!confirm('⚠️ WARNING: This will permanently delete ALL queries, responses, and ratings. This action cannot be undone. Are you sure?')) {
       return;
@@ -264,6 +333,53 @@ export default function Admin() {
       console.error('Error deleting evaluations:', err);
       alert('❌ Failed to delete evaluation data. Check console for details.');
     }
+  };
+
+  const sortData = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortedRatings = () => {
+    if (!analyticsData?.allRatings) return [];
+
+    const sorted = [...analyticsData.allRatings].sort((a: any, b: any) => {
+      let aVal, bVal;
+
+      switch (sortConfig.key) {
+        case 'student':
+          aVal = a.responses?.queries?.user_email || '';
+          bVal = b.responses?.queries?.user_email || '';
+          break;
+        case 'question':
+          aVal = a.responses?.queries?.content || '';
+          bVal = b.responses?.queries?.content || '';
+          break;
+        case 'model':
+          aVal = a.responses?.model_name || '';
+          bVal = b.responses?.model_name || '';
+          break;
+        case 'rank':
+          aVal = a.score;
+          bVal = b.score;
+          break;
+        case 'created_at':
+          aVal = new Date(a.created_at).getTime();
+          bVal = new Date(b.created_at).getTime();
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
   };
 
   const deleteQueryAndRelated = async (queryId: string) => {
@@ -632,24 +748,6 @@ export default function Admin() {
                       </div>
                     </div>
 
-                    {/* Data Management */}
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 rounded-xl p-6">
-                      <h4 className="text-lg font-bold text-red-900 mb-2 flex items-center gap-2">
-                        🗑️ Data Management
-                      </h4>
-                      <p className="text-sm text-red-700 mb-4">
-                        Manage evaluation data. Use caution - deletions are permanent!
-                      </p>
-                      <button
-                        onClick={deleteAllEvaluations}
-                        className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
-                      >
-                        🗑️ Delete All Evaluation Data
-                      </button>
-                      <p className="text-xs text-red-600 mt-2">
-                        This will delete all queries, responses, and ratings. Cannot be undone!
-                      </p>
-                    </div>
 
                     {/* Model Performance Comparison */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -697,26 +795,91 @@ export default function Admin() {
 
                     {/* Detailed Student Responses Table */}
                     <div className="bg-white border border-gray-200 rounded-xl p-6">
-                      <h4 className="text-lg font-bold text-gray-900 mb-4">📋 Detailed Evaluation Records</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-bold text-gray-900">📋 Detailed Evaluation Records</h4>
+                        <div className="flex items-center gap-2">
+                          {selectedRatings.size > 0 && (
+                            <>
+                              <span className="text-sm text-gray-600">{selectedRatings.size} selected</span>
+                              <button
+                                onClick={deleteSelectedRatings}
+                                className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1"
+                              >
+                                🗑️ Delete Selected
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={deleteAllEvaluations}
+                            className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                            title="Delete all evaluation data"
+                          >
+                            🗑️ Delete All
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                              <th className="px-4 py-3 text-left">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedRatings.size === analyticsData.allRatings?.length && analyticsData.allRatings?.length > 0}
+                                  onChange={toggleSelectAll}
+                                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                              </th>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => sortData('student')}
+                              >
+                                Student {sortConfig.key === 'student' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => sortData('question')}
+                              >
+                                Question {sortConfig.key === 'question' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => sortData('model')}
+                              >
+                                Model {sortConfig.key === 'model' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => sortData('rank')}
+                              >
+                                Rank {sortConfig.key === 'rank' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                              </th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response Preview</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                              <th
+                                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => sortData('created_at')}
+                              >
+                                Date {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {analyticsData.allRatings?.slice(0, 50).map((rating: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-gray-50">
+                            {getSortedRatings().slice(0, 50).map((rating: any) => (
+                              <tr key={rating.id} className={`hover:bg-gray-50 transition-colors ${selectedRatings.has(rating.id) ? 'bg-blue-50' : ''}`}>
+                                <td className="px-4 py-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedRatings.has(rating.id)}
+                                    onChange={() => toggleSelectRating(rating.id)}
+                                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                </td>
                                 <td className="px-4 py-3 text-sm text-gray-900">
                                   {rating.responses?.queries?.user_email?.split('@')[0] || 'N/A'}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={rating.responses?.queries?.content}>
                                   {rating.responses?.queries?.content || 'N/A'}
                                 </td>
                                 <td className="px-4 py-3">
@@ -733,22 +896,37 @@ export default function Admin() {
                                     {rating.score === 1 ? '🥇 1st' : rating.score === 2 ? '🥈 2nd' : '🥉 3rd'}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
+                                <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={rating.responses?.content}>
                                   {rating.responses?.content?.substring(0, 50) || 'N/A'}...
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                                   {new Date(rating.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <button
+                                    onClick={() => deleteRating(rating.id)}
+                                    className="text-red-600 hover:text-red-800 transition-colors"
+                                    title="Delete this evaluation"
+                                  >
+                                    🗑️
+                                  </button>
                                 </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
-                      {analyticsData.allRatings?.length > 50 && (
-                        <p className="text-sm text-gray-500 mt-4 text-center">
-                          Showing first 50 of {analyticsData.allRatings.length} evaluations. Export CSV for complete data.
+
+                      <div className="mt-4 flex items-center justify-between">
+                        <p className="text-sm text-gray-500">
+                          {analyticsData.allRatings?.length > 50
+                            ? `Showing first 50 of ${analyticsData.allRatings.length} evaluations`
+                            : `Showing all ${analyticsData.allRatings?.length || 0} evaluations`}
                         </p>
-                      )}
+                        <p className="text-xs text-gray-400">
+                          💡 Tip: Click column headers to sort • Select rows to bulk delete
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
