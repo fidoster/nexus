@@ -340,7 +340,7 @@ export default function Admin() {
                   Select which AI models to use for generating responses. Models will only work if their API keys are configured.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
-                  {['GPT-4', 'GPT-3.5-Turbo', 'Claude 3 Opus', 'Claude 3 Sonnet', 'Gemini Pro', 'Llama 3'].map((model) => (
+                  {['GPT (OpenAI)', 'Claude (Anthropic)', 'Gemini (Google)', 'Llama (Meta)'].map((model) => (
                     <div key={model} className="border border-gray-200 rounded-lg p-4 flex items-center justify-between">
                       <span className="font-medium">{model}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
