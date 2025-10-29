@@ -135,14 +135,14 @@ export default function Admin() {
         .from('ratings')
         .select(`
           *,
-          response:responses(
+          responses(
             id,
             model_name,
             content,
-            query:queries(
+            queries(
               id,
               content,
-              user:profiles(email)
+              user_id
             )
           )
         `)
@@ -150,10 +150,30 @@ export default function Admin() {
 
       if (ratingsError) throw ratingsError;
 
+      // Fetch user emails separately and map them
+      const userIds = [...new Set(allRatings?.map((r: any) => r.responses?.queries?.user_id).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .in('id', userIds);
+
+      // Create a map of user_id to email
+      const userEmailMap = profiles?.reduce((acc: any, profile: any) => {
+        acc[profile.id] = profile.email;
+        return acc;
+      }, {}) || {};
+
+      // Attach emails to ratings
+      allRatings?.forEach((rating: any) => {
+        if (rating.responses?.queries) {
+          rating.responses.queries.user_email = userEmailMap[rating.responses.queries.user_id];
+        }
+      });
+
       // Calculate model performance statistics
       const modelStats: any = {};
       allRatings?.forEach((rating: any) => {
-        const modelName = rating.response?.model_name;
+        const modelName = rating.responses?.model_name;
         if (!modelName) return;
 
         if (!modelStats[modelName]) {
@@ -198,11 +218,11 @@ export default function Admin() {
 
     analyticsData.allRatings.forEach((rating: any) => {
       const row = [
-        rating.response?.query?.user?.email || 'N/A',
-        `"${rating.response?.query?.content?.replace(/"/g, '""') || 'N/A'}"`,
-        rating.response?.model_name || 'N/A',
+        rating.responses?.queries?.user_email || 'N/A',
+        `"${rating.responses?.queries?.content?.replace(/"/g, '""') || 'N/A'}"`,
+        rating.responses?.model_name || 'N/A',
         rating.score,
-        `"${rating.response?.content?.substring(0, 50).replace(/"/g, '""') || 'N/A'}..."`,
+        `"${rating.responses?.content?.substring(0, 50).replace(/"/g, '""') || 'N/A'}..."`,
         new Date(rating.created_at).toLocaleString()
       ].join(',');
       csvRows.push(row);
@@ -605,14 +625,14 @@ export default function Admin() {
                             {analyticsData.allRatings?.slice(0, 50).map((rating: any, idx: number) => (
                               <tr key={idx} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 text-sm text-gray-900">
-                                  {rating.response?.query?.user?.email?.split('@')[0] || 'N/A'}
+                                  {rating.responses?.queries?.user_email?.split('@')[0] || 'N/A'}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                                  {rating.response?.query?.content || 'N/A'}
+                                  {rating.responses?.queries?.content || 'N/A'}
                                 </td>
                                 <td className="px-4 py-3">
                                   <span className="px-2 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800 rounded">
-                                    {rating.response?.model_name || 'N/A'}
+                                    {rating.responses?.model_name || 'N/A'}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3">
@@ -625,7 +645,7 @@ export default function Admin() {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                                  {rating.response?.content?.substring(0, 50) || 'N/A'}...
+                                  {rating.responses?.content?.substring(0, 50) || 'N/A'}...
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                                   {new Date(rating.created_at).toLocaleDateString()}
