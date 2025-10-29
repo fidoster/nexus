@@ -275,19 +275,23 @@ export default function Admin() {
     }
 
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from('ratings')
         .delete()
-        .in('id', Array.from(selectedRatings));
+        .in('id', Array.from(selectedRatings))
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error details:', error);
+        throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+      }
 
       alert(`✅ Deleted ${selectedRatings.size} evaluation(s) successfully!`);
       setSelectedRatings(new Set());
       await loadAnalytics();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting ratings:', err);
-      alert('❌ Failed to delete evaluations.');
+      alert(`❌ Failed to delete evaluations.\n\n${err.message || 'Unknown error'}`);
     }
   };
 
@@ -297,18 +301,22 @@ export default function Admin() {
     }
 
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('ratings')
         .delete()
-        .eq('id', ratingId);
+        .eq('id', ratingId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error details:', error);
+        throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+      }
 
       alert('✅ Evaluation deleted successfully!');
       await loadAnalytics();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting rating:', err);
-      alert('❌ Failed to delete evaluation.');
+      alert(`❌ Failed to delete evaluation.\n\n${err.message || 'Unknown error'}`);
     }
   };
 
