@@ -40,10 +40,13 @@ export default function Dashboard() {
   const [history, setHistory] = useState<Query[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [rankings, setRankings] = useState<{ [key: string]: number }>({});
+  const [requireRating, setRequireRating] = useState(true);
+  const [hasRated, setHasRated] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
     loadHistory();
+    loadAppSettings();
   }, [user]);
 
   const checkAdminStatus = async () => {
@@ -62,9 +65,25 @@ export default function Dashboard() {
       .from('queries')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false})
       .limit(20);
     if (data) setHistory(data);
+  };
+
+  const loadAppSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'require_rating_before_next_message')
+        .single();
+
+      if (data) {
+        setRequireRating(data.setting_value);
+      }
+    } catch (err) {
+      console.log('App settings not found, using defaults');
+    }
   };
 
   const loadQueryResponses = async (queryId: string) => {
@@ -121,6 +140,12 @@ export default function Dashboard() {
     e.preventDefault();
     if (!user || !queryText.trim()) return;
 
+    // Check if rating is required and user hasn't rated yet
+    if (requireRating && responses.length > 0 && !hasRated) {
+      alert('⚠️ Please rate the responses above before asking a new question.');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase
@@ -169,6 +194,8 @@ export default function Dashboard() {
         }));
 
         setResponses(anonymizedResponses);
+        setRankings({}); // Clear previous rankings
+        setHasRated(false); // User needs to rate new responses
         console.log('✅ Responses displayed to user');
       } catch (err) {
         console.error('❌ Error generating responses:', err);
@@ -187,6 +214,7 @@ export default function Dashboard() {
     setResponses([]);
     setQueryText('');
     setRankings({});
+    setHasRated(false);
   };
 
   const handleRankingSelect = async (responseId: string, rank: number) => {
@@ -220,6 +248,7 @@ export default function Dashboard() {
 
     // Assign the ranking
     setRankings({ ...rankings, [responseId]: rank });
+    setHasRated(true); // Mark as rated
 
     // Save to database
     try {
