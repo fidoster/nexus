@@ -546,21 +546,34 @@ export default function Admin() {
 
       console.log(`Toggling ${modelName} to ${newState}...`);
 
-      // Update database
-      const { error } = await supabase
-        .from('enabled_models')
-        .update({
-          is_enabled: newState,
-          updated_at: new Date().toISOString()
-        })
-        .eq('model_name', modelName);
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
 
-      if (error) throw error;
+      // Call serverless function to update (avoids CORS issues)
+      const response = await fetch('/api/toggle-model', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          modelName,
+          isEnabled: newState,
+          authToken: session.access_token
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update model');
+      }
 
       console.log(`✅ ${modelName} ${newState ? 'enabled' : 'disabled'}`);
     } catch (err: any) {
       console.error('Error toggling model:', err);
-      alert(`❌ Failed to update ${modelName}: ${err.message}\n\nPlease ensure the enabled_models table exists in Supabase.`);
+      alert(`❌ Failed to update ${modelName}: ${err.message}`);
       // Revert on error
       loadEnabledModels();
     }
