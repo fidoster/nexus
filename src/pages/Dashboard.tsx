@@ -337,51 +337,53 @@ export default function Dashboard() {
         </div>
 
         {/* History List - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-3 min-h-0">
-          <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
-            Conversations
-          </h3>
-          {conversations.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 px-2">No conversations yet</p>
-          ) : (
-            <div className="space-y-1">
-              {conversations.map((conversation) => {
-                const firstQuery = conversation.queries?.[0];
-                const messageCount = conversation.queries?.length || 0;
-                const title = conversation.title || firstQuery?.content.slice(0, 50) || 'New Chat';
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-3">
+            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
+              Conversations
+            </h3>
+            {conversations.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500 px-2">No conversations yet</p>
+            ) : (
+              <div className="space-y-1">
+                {conversations.map((conversation) => {
+                  const firstQuery = conversation.queries?.[0];
+                  const messageCount = conversation.queries?.length || 0;
+                  const title = conversation.title || firstQuery?.content.slice(0, 50) || 'New Chat';
 
-                return (
-                  <button
-                    key={conversation.id}
-                    onClick={async () => {
-                      setCurrentConversation(conversation);
-                      setShowHistory(false);
-                      // Load the last query's responses for this conversation
-                      if (firstQuery) {
-                        setCurrentQuery(firstQuery);
-                        await loadQueryResponses(firstQuery.id);
-                      }
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group ${
-                      currentConversation?.id === conversation.id ? 'bg-gray-200 dark:bg-gray-700' : ''
-                    }`}
-                  >
-                    <p className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
-                      {title}
-                    </p>
-                    <div className="flex items-center justify-between mt-1">
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {messageCount} message{messageCount !== 1 ? 's' : ''}
+                  return (
+                    <button
+                      key={conversation.id}
+                      onClick={async () => {
+                        setCurrentConversation(conversation);
+                        setShowHistory(false);
+                        // Load the last query's responses for this conversation
+                        if (firstQuery) {
+                          setCurrentQuery(firstQuery);
+                          await loadQueryResponses(firstQuery.id);
+                        }
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group ${
+                        currentConversation?.id === conversation.id ? 'bg-gray-200 dark:bg-gray-700' : ''
+                      }`}
+                    >
+                      <p className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
+                        {title}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(conversation.updated_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {messageCount} message{messageCount !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {new Date(conversation.updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sidebar Footer - Always Visible */}
