@@ -11,7 +11,7 @@ html, body, #root {
   overflow: hidden;
 }
 
-/* Custom scrollbar styles */
+/* Custom scrollbar styles - hidden by default, visible on hover */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
@@ -21,19 +21,25 @@ html, body, #root {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.5);
+  background: transparent; /* Hidden by default */
   border-radius: 3px;
+  transition: background 0.2s;
+}
+
+/* Show scrollbar on container hover */
+.scrollbar-thin:hover::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.7);
+  background: rgba(107, 114, 128, 0.7) !important;
 }
 
 /* Dark mode scrollbar */
-.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+.dark .scrollbar-thin:hover::-webkit-scrollbar-thumb {
   background: rgba(75, 85, 99, 0.5);
 }
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(107, 114, 128, 0.7);
+  background: rgba(107, 114, 128, 0.7) !important;
 }
