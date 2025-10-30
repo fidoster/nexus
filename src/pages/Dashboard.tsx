@@ -402,9 +402,9 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors overflow-hidden">
       {/* Sidebar */}
-      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 grid grid-rows-[auto_1fr_auto] h-full`}>
+      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 relative h-full`}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="absolute top-0 left-0 right-0 p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 z-10">
           <button
             onClick={handleNewChat}
             className="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-medium transition-all shadow-md flex items-center justify-center gap-2"
@@ -416,8 +416,8 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* History List - Scrollable */}
-        <div className="overflow-y-auto overflow-x-hidden scrollbar-thin">
+        {/* History List - Scrollable with padding for header and footer */}
+        <div className="absolute top-[73px] bottom-[120px] left-0 right-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
           <div className="p-3">
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
               Conversations
@@ -479,7 +479,7 @@ export default function Dashboard() {
         </div>
 
         {/* Sidebar Footer - Always Visible */}
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 space-y-2 z-10">
           {isAdmin && (
             <button
               onClick={() => navigate('/admin')}
