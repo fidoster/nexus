@@ -39,18 +39,22 @@ interface Response {
   ranking?: number; // 1 = best, 2 = second, 3 = third
 }
 
+interface MessageGroup {
+  query: Query;
+  responses: Response[];
+  rankings: { [key: string]: number };
+}
+
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
   const [queryText, setQueryText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [currentQuery, setCurrentQuery] = useState<Query | null>(null);
-  const [responses, setResponses] = useState<Response[]>([]);
+  const [messageGroups, setMessageGroups] = useState<MessageGroup[]>([]); // All messages in current conversation
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [rankings, setRankings] = useState<{ [key: string]: number }>({});
   const [requireRating, setRequireRating] = useState(true);
   const [hasRated, setHasRated] = useState(false);
 
@@ -109,53 +113,76 @@ export default function Dashboard() {
     }
   };
 
-  const loadQueryResponses = async (queryId: string) => {
+  const loadConversationMessages = async (conversationId: string) => {
     try {
-      // Load responses for this query, ordered by creation time to maintain consistent display
-      const { data: queryResponses, error } = await supabase
-        .from('responses')
+      // Load all queries in this conversation
+      const { data: queries, error: queriesError } = await supabase
+        .from('queries')
         .select('*')
-        .eq('query_id', queryId)
-        .order('created_at', { ascending: true }); // Keep consistent order
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (queriesError) throw queriesError;
 
-      if (queryResponses && queryResponses.length > 0) {
-        // Don't randomize when loading from history - keep the original order
-        // Assign anonymous labels in the order they were saved
-        const anonymizedResponses = queryResponses.map((resp, index) => ({
-          id: resp.id,
-          model_name: resp.model_name,
-          display_name: `Model ${String.fromCharCode(65 + index)}`,
-          content: resp.content
-        }));
+      if (!queries || queries.length === 0) {
+        setMessageGroups([]);
+        return;
+      }
 
-        setResponses(anonymizedResponses);
+      // Load responses and rankings for all queries
+      const groups: MessageGroup[] = [];
 
-        // Load existing rankings for this query
-        if (user) {
-          const { data: ratingsData } = await supabase
-            .from('ratings')
-            .select('response_id, ranking')
-            .eq('user_id', user.id)
-            .in('response_id', queryResponses.map(r => r.id));
+      for (const query of queries) {
+        const { data: queryResponses } = await supabase
+          .from('responses')
+          .select('*')
+          .eq('query_id', query.id)
+          .order('created_at', { ascending: true });
 
-          if (ratingsData) {
-            const rankingsMap: { [key: string]: number } = {};
-            ratingsData.forEach(rating => {
-              rankingsMap[rating.response_id] = rating.ranking;
-            });
-            setRankings(rankingsMap);
+        if (queryResponses && queryResponses.length > 0) {
+          // Anonymize responses
+          const anonymizedResponses = queryResponses.map((resp, index) => ({
+            id: resp.id,
+            model_name: resp.model_name,
+            display_name: `Model ${String.fromCharCode(65 + index)}`,
+            content: resp.content
+          }));
+
+          // Load rankings for this query
+          let rankingsMap: { [key: string]: number } = {};
+          if (user) {
+            const { data: ratingsData } = await supabase
+              .from('ratings')
+              .select('response_id, score')
+              .eq('user_id', user.id)
+              .in('response_id', queryResponses.map(r => r.id));
+
+            if (ratingsData) {
+              ratingsData.forEach(rating => {
+                rankingsMap[rating.response_id] = rating.score;
+              });
+            }
           }
+
+          groups.push({
+            query,
+            responses: anonymizedResponses,
+            rankings: rankingsMap
+          });
         }
-      } else {
-        setResponses([]);
-        setRankings({});
+      }
+
+      setMessageGroups(groups);
+
+      // Check if the last message has been rated
+      if (groups.length > 0) {
+        const lastGroup = groups[groups.length - 1];
+        const hasAnyRanking = Object.keys(lastGroup.rankings).length > 0;
+        setHasRated(hasAnyRanking);
       }
     } catch (err) {
-      console.error('Error loading query responses:', err);
-      setResponses([]);
-      setRankings({});
+      console.error('Error loading conversation messages:', err);
+      setMessageGroups([]);
     }
   };
 
@@ -164,7 +191,7 @@ export default function Dashboard() {
     if (!user || !queryText.trim()) return;
 
     // Check if rating is required and user hasn't rated yet
-    if (requireRating && responses.length > 0 && !hasRated) {
+    if (requireRating && messageGroups.length > 0 && !hasRated) {
       alert('⚠️ Please rate the responses above before asking a new question.');
       return;
     }
@@ -209,7 +236,6 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      setCurrentQuery(data);
       setQueryText('');
       loadHistory();
 
@@ -242,8 +268,14 @@ export default function Dashboard() {
           content: resp.content
         }));
 
-        setResponses(anonymizedResponses);
-        setRankings({}); // Clear previous rankings
+        // Add new message group to the conversation
+        const newGroup: MessageGroup = {
+          query: data,
+          responses: anonymizedResponses,
+          rankings: {}
+        };
+
+        setMessageGroups([...messageGroups, newGroup]);
         setHasRated(false); // User needs to rate new responses
         console.log('✅ Responses displayed to user');
       } catch (err) {
@@ -259,11 +291,9 @@ export default function Dashboard() {
   };
 
   const handleNewChat = () => {
-    setCurrentQuery(null);
     setCurrentConversation(null);
-    setResponses([]);
+    setMessageGroups([]);
     setQueryText('');
-    setRankings({});
     setHasRated(false);
   };
 
@@ -296,14 +326,21 @@ export default function Dashboard() {
     }
   };
 
-  const handleRankingSelect = async (responseId: string, rank: number) => {
+  const handleRankingSelect = async (groupIndex: number, responseId: string, rank: number) => {
     if (!user) return;
 
+    const group = messageGroups[groupIndex];
+    const currentRankings = group.rankings;
+
     // Toggle: if already selected, deselect it
-    if (rankings[responseId] === rank) {
-      const newRankings = { ...rankings };
+    if (currentRankings[responseId] === rank) {
+      const newRankings = { ...currentRankings };
       delete newRankings[responseId];
-      setRankings(newRankings);
+
+      // Update message groups
+      const updatedGroups = [...messageGroups];
+      updatedGroups[groupIndex] = { ...group, rankings: newRankings };
+      setMessageGroups(updatedGroups);
 
       // Delete from database
       try {
@@ -318,16 +355,23 @@ export default function Dashboard() {
       return;
     }
 
-    // Check if this rank is already assigned to another response
-    const responseWithThisRank = Object.entries(rankings).find(([_, r]) => r === rank);
+    // Check if this rank is already assigned to another response in this group
+    const responseWithThisRank = Object.entries(currentRankings).find(([_, r]) => r === rank);
     if (responseWithThisRank) {
       alert('This ranking has already been assigned to another model. Please deselect it first.');
       return;
     }
 
     // Assign the ranking
-    setRankings({ ...rankings, [responseId]: rank });
-    setHasRated(true); // Mark as rated
+    const newRankings = { ...currentRankings, [responseId]: rank };
+    const updatedGroups = [...messageGroups];
+    updatedGroups[groupIndex] = { ...group, rankings: newRankings };
+    setMessageGroups(updatedGroups);
+
+    // If this is the last message group, mark as rated
+    if (groupIndex === messageGroups.length - 1) {
+      setHasRated(true);
+    }
 
     // Save to database
     try {
@@ -399,11 +443,8 @@ export default function Dashboard() {
                         onClick={async () => {
                           setCurrentConversation(conversation);
                           setShowHistory(false);
-                          // Load the last query's responses for this conversation
-                          if (firstQuery) {
-                            setCurrentQuery(firstQuery);
-                            await loadQueryResponses(firstQuery.id);
-                          }
+                          // Load all messages in this conversation
+                          await loadConversationMessages(conversation.id);
                         }}
                         className="w-full text-left px-3 py-2 pr-10"
                       >
@@ -498,7 +539,7 @@ export default function Dashboard() {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto">
-          {!currentQuery && responses.length === 0 ? (
+          {messageGroups.length === 0 && !submitting ? (
             /* Welcome Screen */
             <div className="h-full flex items-center justify-center p-4">
               <div className="text-center max-w-2xl">
@@ -534,21 +575,112 @@ export default function Dashboard() {
             </div>
           ) : (
             /* Chat Messages */
-            <div className="max-w-5xl mx-auto p-4 space-y-6">
-              {/* User Query */}
-              {currentQuery && (
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white text-sm font-medium">{user?.email?.[0].toUpperCase()}</span>
+            <div className="max-w-5xl mx-auto p-4 space-y-8">
+              {/* All Message Groups in Conversation */}
+              {messageGroups.map((group, groupIndex) => (
+                <div key={group.query.id} className="space-y-4">
+                  {/* User Query */}
+                  <div className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-sm font-medium">{user?.email?.[0].toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-gray-900 dark:text-white">{group.query.content}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {new Date(group.query.created_at).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-gray-900 dark:text-white">{currentQuery.content}</p>
-                  </div>
-                </div>
-              )}
 
-              {/* AI Responses */}
-              {submitting && responses.length === 0 && (
+                  {/* AI Responses for this query */}
+                  {group.responses.length > 0 && (
+                    <div className="space-y-4 ml-12">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {group.responses.length > 1
+                          ? 'Rank the responses from best to worst. Models are anonymized for unbiased evaluation.'
+                          : 'Review the AI response below. Model identity is anonymized for unbiased evaluation.'}
+                      </p>
+                      <div className={`grid gap-4 items-stretch ${
+                        group.responses.length === 1
+                          ? 'grid-cols-1'
+                          : group.responses.length === 2
+                          ? 'md:grid-cols-2'
+                          : group.responses.length === 3
+                          ? 'md:grid-cols-2 lg:grid-cols-3'
+                          : group.responses.length === 4
+                          ? 'md:grid-cols-2 lg:grid-cols-4'
+                          : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                      }`}>
+                        {group.responses.map((response) => (
+                          <div
+                            key={response.id}
+                            className={`bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border-2 transition-all flex flex-col h-full ${
+                              group.rankings[response.id]
+                                ? group.rankings[response.id] === 1
+                                  ? 'border-yellow-400 dark:border-yellow-500 shadow-lg shadow-yellow-500/30'
+                                  : group.rankings[response.id] === 2
+                                  ? 'border-cyan-400 dark:border-cyan-500 shadow-lg shadow-cyan-500/30'
+                                  : 'border-orange-400 dark:border-orange-600 shadow-lg shadow-orange-500/30'
+                                : 'border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                                  <span className="text-white text-sm font-bold">{response.display_name.split(' ')[1]}</span>
+                                </div>
+                                <h4 className="font-semibold text-gray-900 dark:text-white">{response.display_name}</h4>
+                              </div>
+                              {group.rankings[response.id] && (
+                                <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
+                                  {group.rankings[response.id] === 1 ? '1st' : group.rankings[response.id] === 2 ? '2nd' : '3rd'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 flex-1 overflow-y-auto whitespace-pre-wrap">
+                              {response.content}
+                            </div>
+                            {group.responses.length > 1 && (
+                              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Rank this response:</p>
+                                <div className="flex gap-2">
+                                  {[...Array(Math.min(group.responses.length, 3))].map((_, index) => {
+                                    const rank = index + 1;
+                                    const rankLabels = ['1st Best', '2nd Best', '3rd Best', '4th', '5th', '6th', '7th'];
+                                    const rankColors = [
+                                      { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-100 dark:hover:bg-yellow-900', shadow: 'shadow-yellow-500/50' },
+                                      { bg: 'bg-cyan-500', hover: 'hover:bg-cyan-100 dark:hover:bg-cyan-900', shadow: 'shadow-cyan-500/50' },
+                                      { bg: 'bg-orange-500', hover: 'hover:bg-orange-100 dark:hover:bg-orange-900', shadow: 'shadow-orange-500/50' }
+                                    ];
+                                    const color = rankColors[index] || rankColors[2];
+
+                                    return (
+                                      <button
+                                        key={rank}
+                                        onClick={() => handleRankingSelect(groupIndex, response.id, rank)}
+                                        className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                          group.rankings[response.id] === rank
+                                            ? `${color.bg} text-white shadow-lg ${color.shadow}`
+                                            : `bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 ${color.hover}`
+                                        }`}
+                                      >
+                                        {rankLabels[index]}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Loading indicator for new message */}
+              {submitting && (
                 <div className="flex gap-4">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-white animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -557,90 +689,6 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1">
                     <p className="text-gray-600 dark:text-gray-400">Generating responses from AI models...</p>
-                  </div>
-                </div>
-              )}
-
-              {responses.length > 0 && (
-                <div className="space-y-6">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                    {responses.length > 1
-                      ? 'Rank the responses from best to worst. Models are anonymized for unbiased evaluation.'
-                      : 'Review the AI response below. Model identity is anonymized for unbiased evaluation.'}
-                  </p>
-                  <div className={`grid gap-4 items-stretch ${
-                    responses.length === 1
-                      ? 'grid-cols-1'
-                      : responses.length === 2
-                      ? 'md:grid-cols-2'
-                      : responses.length === 3
-                      ? 'md:grid-cols-2 lg:grid-cols-3'
-                      : responses.length === 4
-                      ? 'md:grid-cols-2 lg:grid-cols-4'
-                      : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                  }`}>
-                    {responses.map((response) => (
-                      <div
-                        key={response.id}
-                        className={`bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border-2 transition-all flex flex-col h-full ${
-                          rankings[response.id]
-                            ? rankings[response.id] === 1
-                              ? 'border-yellow-400 dark:border-yellow-500 shadow-lg shadow-yellow-500/30'
-                              : rankings[response.id] === 2
-                              ? 'border-cyan-400 dark:border-cyan-500 shadow-lg shadow-cyan-500/30'
-                              : 'border-orange-400 dark:border-orange-600 shadow-lg shadow-orange-500/30'
-                            : 'border-gray-200 dark:border-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                              <span className="text-white text-sm font-bold">{response.display_name.split(' ')[1]}</span>
-                            </div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white">{response.display_name}</h4>
-                          </div>
-                          {rankings[response.id] && (
-                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300">
-                              {rankings[response.id] === 1 ? '1st' : rankings[response.id] === 2 ? '2nd' : '3rd'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 flex-1 overflow-y-auto whitespace-pre-wrap">
-                          {response.content}
-                        </div>
-                        {responses.length > 1 && (
-                          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Rank this response:</p>
-                            <div className="flex gap-2">
-                              {[...Array(Math.min(responses.length, 3))].map((_, index) => {
-                                const rank = index + 1;
-                                const rankLabels = ['1st Best', '2nd Best', '3rd Best', '4th', '5th', '6th', '7th'];
-                                const rankColors = [
-                                  { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-100 dark:hover:bg-yellow-900', shadow: 'shadow-yellow-500/50' },
-                                  { bg: 'bg-cyan-500', hover: 'hover:bg-cyan-100 dark:hover:bg-cyan-900', shadow: 'shadow-cyan-500/50' },
-                                  { bg: 'bg-orange-500', hover: 'hover:bg-orange-100 dark:hover:bg-orange-900', shadow: 'shadow-orange-500/50' }
-                                ];
-                                const color = rankColors[index] || rankColors[2];
-
-                                return (
-                                  <button
-                                    key={rank}
-                                    onClick={() => handleRankingSelect(response.id, rank)}
-                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                      rankings[response.id] === rank
-                                        ? `${color.bg} text-white shadow-lg ${color.shadow}`
-                                        : `bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 ${color.hover}`
-                                    }`}
-                                  >
-                                    {rankLabels[index]}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}
