@@ -82,7 +82,14 @@ export default function Dashboard() {
       .order('updated_at', { ascending: false })
       .limit(20);
     if (data) {
-      setConversations(data as Conversation[]);
+      // Sort queries within each conversation by creation time
+      const conversationsWithSortedQueries = data.map(conv => ({
+        ...conv,
+        queries: conv.queries?.sort((a: Query, b: Query) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        )
+      }));
+      setConversations(conversationsWithSortedQueries as Conversation[]);
     }
   };
 
@@ -260,6 +267,35 @@ export default function Dashboard() {
     setHasRated(false);
   };
 
+  const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent clicking conversation when clicking delete
+
+    if (!confirm('Are you sure you want to delete this conversation? This will also delete all messages and responses.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      // If we're deleting the current conversation, clear the view
+      if (currentConversation?.id === conversationId) {
+        handleNewChat();
+      }
+
+      // Reload the conversation list
+      await loadHistory();
+      console.log('✅ Conversation deleted successfully');
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+      alert('Failed to delete conversation. Please try again.');
+    }
+  };
+
   const handleRankingSelect = async (responseId: string, rank: number) => {
     if (!user) return;
 
@@ -349,36 +385,51 @@ export default function Dashboard() {
                 {conversations.map((conversation) => {
                   const firstQuery = conversation.queries?.[0];
                   const messageCount = conversation.queries?.length || 0;
-                  const title = conversation.title || firstQuery?.content.slice(0, 50) || 'New Chat';
+                  // Use first query content as title, not the stored title field
+                  const title = firstQuery?.content.slice(0, 50) || 'New Chat';
 
                   return (
-                    <button
+                    <div
                       key={conversation.id}
-                      onClick={async () => {
-                        setCurrentConversation(conversation);
-                        setShowHistory(false);
-                        // Load the last query's responses for this conversation
-                        if (firstQuery) {
-                          setCurrentQuery(firstQuery);
-                          await loadQueryResponses(firstQuery.id);
-                        }
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group ${
+                      className={`relative group/item rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
                         currentConversation?.id === conversation.id ? 'bg-gray-200 dark:bg-gray-700' : ''
                       }`}
                     >
-                      <p className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
-                        {title}
-                      </p>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {messageCount} message{messageCount !== 1 ? 's' : ''}
+                      <button
+                        onClick={async () => {
+                          setCurrentConversation(conversation);
+                          setShowHistory(false);
+                          // Load the last query's responses for this conversation
+                          if (firstQuery) {
+                            setCurrentQuery(firstQuery);
+                            await loadQueryResponses(firstQuery.id);
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 pr-10"
+                      >
+                        <p className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
+                          {title}
                         </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(conversation.updated_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </button>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {messageCount} message{messageCount !== 1 ? 's' : ''}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(conversation.updated_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+                      {/* Delete button - shown on hover */}
+                      <button
+                        onClick={(e) => handleDeleteConversation(conversation.id, e)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover/item:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all"
+                        title="Delete conversation"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
