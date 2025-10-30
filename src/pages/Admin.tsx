@@ -784,7 +784,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors relative overflow-hidden">
+    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors relative overflow-y-auto scrollbar-thin">
       {/* Enhanced background */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950"></div>
       <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 dark:from-indigo-600/5 dark:to-purple-600/5 rounded-full blur-3xl"></div>
