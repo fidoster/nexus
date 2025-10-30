@@ -402,7 +402,7 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors overflow-hidden">
       {/* Sidebar */}
-      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full overflow-hidden`}>
+      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full`}>
         {/* Sidebar Header */}
         <div className="shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
           <button
