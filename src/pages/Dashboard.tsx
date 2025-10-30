@@ -14,11 +14,21 @@ import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import { generateAIResponses } from '../services/aiServiceVercel';
 
+interface Conversation {
+  id: string;
+  user_id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+  queries?: Query[];
+}
+
 interface Query {
   id: string;
   content: string;
   status: string;
   created_at: string;
+  conversation_id?: string;
 }
 
 interface Response {
@@ -37,7 +47,8 @@ export default function Dashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [currentQuery, setCurrentQuery] = useState<Query | null>(null);
   const [responses, setResponses] = useState<Response[]>([]);
-  const [history, setHistory] = useState<Query[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [rankings, setRankings] = useState<{ [key: string]: number }>({});
   const [requireRating, setRequireRating] = useState(true);
@@ -62,12 +73,17 @@ export default function Dashboard() {
   const loadHistory = async () => {
     if (!user) return;
     const { data } = await supabase
-      .from('queries')
-      .select('*')
+      .from('conversations')
+      .select(`
+        *,
+        queries(*)
+      `)
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false})
+      .order('updated_at', { ascending: false })
       .limit(20);
-    if (data) setHistory(data);
+    if (data) {
+      setConversations(data as Conversation[]);
+    }
   };
 
   const loadAppSettings = async () => {
@@ -148,10 +164,36 @@ export default function Dashboard() {
 
     setSubmitting(true);
     try {
+      let conversationId = currentConversation?.id;
+
+      // Create new conversation if none exists
+      if (!conversationId) {
+        const { data: newConv, error: convError } = await supabase
+          .from('conversations')
+          .insert([{
+            user_id: user.id,
+            title: queryText.trim().slice(0, 50) // Use first 50 chars as title
+          }])
+          .select()
+          .single();
+
+        if (convError) throw convError;
+        conversationId = newConv.id;
+        setCurrentConversation(newConv);
+      } else {
+        // Update conversation timestamp
+        await supabase
+          .from('conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', conversationId);
+      }
+
+      // Create query within conversation
       const { data, error } = await supabase
         .from('queries')
         .insert([{
           user_id: user.id,
+          conversation_id: conversationId,
           content: queryText.trim(),
           status: 'pending'
         }])
@@ -211,6 +253,7 @@ export default function Dashboard() {
 
   const handleNewChat = () => {
     setCurrentQuery(null);
+    setCurrentConversation(null);
     setResponses([]);
     setQueryText('');
     setRankings({});
@@ -296,31 +339,47 @@ export default function Dashboard() {
         {/* History List - Scrollable */}
         <div className="flex-1 overflow-y-auto p-3 min-h-0">
           <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
-            Recent Chats
+            Conversations
           </h3>
-          {history.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 px-2">No chats yet</p>
+          {conversations.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500 px-2">No conversations yet</p>
           ) : (
             <div className="space-y-1">
-              {history.map((query) => (
-                <button
-                  key={query.id}
-                  onClick={async () => {
-                    setCurrentQuery(query);
-                    setShowHistory(false);
-                    // Load the responses for this query
-                    await loadQueryResponses(query.id);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group"
-                >
-                  <p className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                    {query.content.slice(0, 50)}...
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {new Date(query.created_at).toLocaleDateString()}
-                  </p>
-                </button>
-              ))}
+              {conversations.map((conversation) => {
+                const firstQuery = conversation.queries?.[0];
+                const messageCount = conversation.queries?.length || 0;
+                const title = conversation.title || firstQuery?.content.slice(0, 50) || 'New Chat';
+
+                return (
+                  <button
+                    key={conversation.id}
+                    onClick={async () => {
+                      setCurrentConversation(conversation);
+                      setShowHistory(false);
+                      // Load the last query's responses for this conversation
+                      if (firstQuery) {
+                        setCurrentQuery(firstQuery);
+                        await loadQueryResponses(firstQuery.id);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group ${
+                      currentConversation?.id === conversation.id ? 'bg-gray-200 dark:bg-gray-700' : ''
+                    }`}
+                  >
+                    <p className="text-sm text-gray-700 dark:text-gray-300 truncate font-medium">
+                      {title}
+                    </p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {messageCount} message{messageCount !== 1 ? 's' : ''}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {new Date(conversation.updated_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
