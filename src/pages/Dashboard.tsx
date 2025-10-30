@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
+import { generateAIResponses } from '../services/aiService';
 
 interface Query {
   id: string;
@@ -88,44 +89,41 @@ export default function Dashboard() {
       setQueryText('');
       loadHistory();
 
-      // Simulate AI responses (replace with actual API calls later)
-      setTimeout(async () => {
-        const mockResponses = [
-          { model_name: 'GPT', content: 'This is a sample response from GPT model. In production, this will be replaced with actual API calls to OpenAI.' },
-          { model_name: 'Claude', content: 'This is a sample response from Claude model. In production, this will be replaced with actual API calls to Anthropic.' },
-          { model_name: 'Gemini', content: 'This is a sample response from Gemini model. In production, this will be replaced with actual API calls to Google.' },
-        ];
+      // Generate AI responses using real APIs or mock data
+      try {
+        console.log('🚀 Generating AI responses...');
+        const aiResponses = await generateAIResponses(queryText.trim());
+        console.log('✅ Received responses:', aiResponses.length);
 
         // Save responses to database
-        try {
-          const responsesToInsert = mockResponses.map(resp => ({
-            query_id: data.id,
-            model_name: resp.model_name,
-            content: resp.content
-          }));
+        const responsesToInsert = aiResponses.map(resp => ({
+          query_id: data.id,
+          model_name: resp.model_name,
+          content: resp.content
+        }));
 
-          const { data: savedResponses, error: responseError } = await supabase
-            .from('responses')
-            .insert(responsesToInsert)
-            .select();
+        const { data: savedResponses, error: responseError } = await supabase
+          .from('responses')
+          .insert(responsesToInsert)
+          .select();
 
-          if (responseError) throw responseError;
+        if (responseError) throw responseError;
 
-          // Randomize order and assign anonymous labels for display
-          const shuffled = [...savedResponses].sort(() => Math.random() - 0.5);
-          const anonymizedResponses = shuffled.map((resp, index) => ({
-            id: resp.id,
-            model_name: resp.model_name, // Keep actual name for database operations
-            display_name: `Model ${String.fromCharCode(65 + index)}`, // A, B, C
-            content: resp.content
-          }));
+        // Randomize order and assign anonymous labels for display
+        const shuffled = [...savedResponses].sort(() => Math.random() - 0.5);
+        const anonymizedResponses = shuffled.map((resp, index) => ({
+          id: resp.id,
+          model_name: resp.model_name, // Keep actual name for database operations
+          display_name: `Model ${String.fromCharCode(65 + index)}`, // A, B, C
+          content: resp.content
+        }));
 
-          setResponses(anonymizedResponses);
-        } catch (err) {
-          console.error('Error saving responses:', err);
-          alert('Failed to generate responses');
-        }
-      }, 1500);
+        setResponses(anonymizedResponses);
+        console.log('✅ Responses displayed to user');
+      } catch (err) {
+        console.error('❌ Error generating responses:', err);
+        alert('Failed to generate responses. Please try again.');
+      }
     } catch (err) {
       console.error('Error submitting query:', err);
       alert('Failed to submit query');
