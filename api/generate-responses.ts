@@ -103,6 +103,118 @@ async function callGoogleAI(query: string, systemPrompt: SystemPrompt, apiKey: s
   return data.candidates[0]?.content?.parts[0]?.text || 'No response generated';
 }
 
+// Call DeepSeek API
+async function callDeepSeek(query: string, systemPrompt: SystemPrompt, apiKey: string): Promise<string> {
+  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt.prompt_text },
+        { role: 'user', content: query }
+      ],
+      max_tokens: systemPrompt.max_tokens,
+      temperature: systemPrompt.temperature
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'DeepSeek API error');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response generated';
+}
+
+// Call Mistral API
+async function callMistral(query: string, systemPrompt: SystemPrompt, apiKey: string): Promise<string> {
+  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'mistral-small-latest',
+      messages: [
+        { role: 'system', content: systemPrompt.prompt_text },
+        { role: 'user', content: query }
+      ],
+      max_tokens: systemPrompt.max_tokens,
+      temperature: systemPrompt.temperature
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Mistral API error');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response generated';
+}
+
+// Call Groq API (Fast Llama models)
+async function callGroq(query: string, systemPrompt: SystemPrompt, apiKey: string): Promise<string> {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt.prompt_text },
+        { role: 'user', content: query }
+      ],
+      max_tokens: systemPrompt.max_tokens,
+      temperature: systemPrompt.temperature
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Groq API error');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response generated';
+}
+
+// Call Perplexity API
+async function callPerplexity(query: string, systemPrompt: SystemPrompt, apiKey: string): Promise<string> {
+  const response = await fetch('https://api.perplexity.ai/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-sonar-small-128k-online',
+      messages: [
+        { role: 'system', content: systemPrompt.prompt_text },
+        { role: 'user', content: query }
+      ],
+      max_tokens: systemPrompt.max_tokens,
+      temperature: systemPrompt.temperature
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Perplexity API error');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response generated';
+}
+
 // Mock response for missing API keys
 function getMockResponse(modelName: string, query: string): string {
   return `This is a demo response from ${modelName}. To enable real AI responses, add API keys to Vercel environment variables.
@@ -167,14 +279,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const openaiKey = process.env.OPENAI_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     const googleKey = process.env.GOOGLE_AI_API_KEY;
+    const deepseekKey = process.env.DEEPSEEK_API_KEY;
+    const mistralKey = process.env.MISTRAL_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
+    const perplexityKey = process.env.PERPLEXITY_API_KEY;
 
     const responses: AIResponse[] = [];
 
-    // Process each model
+    // Process each model (add only models you want to use)
     const models = [
       { name: 'GPT', key: openaiKey, call: callOpenAI },
       { name: 'Claude', key: anthropicKey, call: callAnthropic },
-      { name: 'Gemini', key: googleKey, call: callGoogleAI }
+      { name: 'Gemini', key: googleKey, call: callGoogleAI },
+      { name: 'DeepSeek', key: deepseekKey, call: callDeepSeek },
+      { name: 'Mistral', key: mistralKey, call: callMistral },
+      { name: 'Groq', key: groqKey, call: callGroq },
+      { name: 'Perplexity', key: perplexityKey, call: callPerplexity }
     ];
 
     for (const model of models) {
