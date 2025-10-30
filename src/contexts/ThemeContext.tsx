@@ -11,20 +11,18 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
-    // Check localStorage or system preference
+    // Check localStorage or default to dark
     const stored = localStorage.getItem('nexus_theme') as Theme;
     if (stored) {
       setTheme(stored);
       document.documentElement.classList.toggle('dark', stored === 'dark');
     } else {
-      // Check system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const initialTheme = prefersDark ? 'dark' : 'light';
-      setTheme(initialTheme);
-      document.documentElement.classList.toggle('dark', prefersDark);
+      // Default to dark theme
+      setTheme('dark');
+      document.documentElement.classList.add('dark');
     }
   }, []);
 
