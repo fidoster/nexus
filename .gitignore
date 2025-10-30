@@ -43,3 +43,7 @@ coverage
 .parcel-cache
 .vercel
 .turbo
+
+# Documentation and database files
+docs/
+database/
