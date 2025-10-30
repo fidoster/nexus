@@ -52,6 +52,9 @@ export default function Admin() {
     temperature: 0.7
   });
 
+  // Enabled Models state
+  const [enabledModels, setEnabledModels] = useState<{[key: string]: boolean}>({});
+
   useEffect(() => {
     checkAdminAccess();
   }, [user]);
@@ -59,6 +62,8 @@ export default function Admin() {
   useEffect(() => {
     if (activeTab === 'settings') {
       loadSystemPrompts();
+    } else if (activeTab === 'models') {
+      loadEnabledModels();
     }
   }, [activeTab]);
 
@@ -455,6 +460,112 @@ export default function Admin() {
     }
   };
 
+  // Enabled Models Functions
+  const initializeEnabledModels = async () => {
+    try {
+      // Try to check if table exists by querying it
+      const { data: existingData, error: queryError } = await supabase
+        .from('enabled_models')
+        .select('model_name')
+        .limit(1);
+
+      // If table doesn't exist or is empty, initialize it
+      if (queryError || !existingData || existingData.length === 0) {
+        console.log('Initializing enabled_models table...');
+
+        // Insert default models
+        const defaultModels = [
+          { model_name: 'GPT', is_enabled: true, display_order: 1 },
+          { model_name: 'Claude', is_enabled: true, display_order: 2 },
+          { model_name: 'Gemini', is_enabled: true, display_order: 3 },
+          { model_name: 'DeepSeek', is_enabled: false, display_order: 4 },
+          { model_name: 'Mistral', is_enabled: false, display_order: 5 },
+          { model_name: 'Groq', is_enabled: false, display_order: 6 },
+          { model_name: 'Perplexity', is_enabled: false, display_order: 7 }
+        ];
+
+        const { error: insertError } = await supabase
+          .from('enabled_models')
+          .upsert(defaultModels, { onConflict: 'model_name' });
+
+        if (insertError) {
+          console.error('Error initializing models:', insertError);
+          throw insertError;
+        }
+
+        console.log('✅ Enabled models initialized successfully');
+      }
+    } catch (err) {
+      console.error('Error initializing enabled models:', err);
+    }
+  };
+
+  const loadEnabledModels = async () => {
+    try {
+      // First ensure table is initialized
+      await initializeEnabledModels();
+
+      const { data, error } = await supabase
+        .from('enabled_models')
+        .select('model_name, is_enabled')
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      const modelsMap: {[key: string]: boolean} = {};
+      data?.forEach(model => {
+        modelsMap[model.model_name] = model.is_enabled;
+      });
+      setEnabledModels(modelsMap);
+      console.log('Loaded enabled models:', modelsMap);
+    } catch (err) {
+      console.error('Error loading enabled models:', err);
+      // If table doesn't exist yet, set defaults in UI
+      setEnabledModels({
+        'GPT': true,
+        'Claude': true,
+        'Gemini': true,
+        'DeepSeek': false,
+        'Mistral': false,
+        'Groq': false,
+        'Perplexity': false
+      });
+      alert('⚠️ Could not load model settings. Please ensure the enabled_models table exists in Supabase.');
+    }
+  };
+
+  const toggleModel = async (modelName: string) => {
+    try {
+      const newState = !enabledModels[modelName];
+
+      // Optimistically update UI
+      setEnabledModels(prev => ({
+        ...prev,
+        [modelName]: newState
+      }));
+
+      console.log(`Toggling ${modelName} to ${newState}...`);
+
+      // Update database
+      const { error } = await supabase
+        .from('enabled_models')
+        .update({
+          is_enabled: newState,
+          updated_at: new Date().toISOString()
+        })
+        .eq('model_name', modelName);
+
+      if (error) throw error;
+
+      console.log(`✅ ${modelName} ${newState ? 'enabled' : 'disabled'}`);
+    } catch (err: any) {
+      console.error('Error toggling model:', err);
+      alert(`❌ Failed to update ${modelName}: ${err.message}\n\nPlease ensure the enabled_models table exists in Supabase.`);
+      // Revert on error
+      loadEnabledModels();
+    }
+  };
+
   const createSystemPrompt = async () => {
     if (!newPrompt.name || !newPrompt.prompt_text) {
       alert('Please fill in both name and prompt text');
@@ -816,29 +927,34 @@ export default function Admin() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">AI Models Configuration</h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Select which AI models to use for generating responses. Models will only work if their API keys are configured.
+                  Select which AI models to use for generating responses. Only enabled models will be used in evaluations.
                 </p>
                 <div className="grid md:grid-cols-2 gap-4">
                   {[
-                    { name: 'GPT', provider: 'OpenAI', icon: '🤖' },
-                    { name: 'Claude', provider: 'Anthropic', icon: '🧠' },
-                    { name: 'Gemini', provider: 'Google', icon: '✨' },
-                    { name: 'Llama', provider: 'Meta', icon: '🦙' },
-                    { name: 'Mistral', provider: 'Mistral AI', icon: '🌪️' },
-                    { name: 'Perplexity', provider: 'Perplexity', icon: '🔍' },
-                    { name: 'Cohere', provider: 'Cohere', icon: '🌐' },
-                    { name: 'DeepSeek', provider: 'DeepSeek', icon: '🔬' }
+                    { name: 'GPT', provider: 'OpenAI (GPT-4o-mini)', icon: '🤖', cost: '$0.15/1K' },
+                    { name: 'Claude', provider: 'Anthropic (Claude 3.5 Haiku)', icon: '🧠', cost: '$0.25/1K' },
+                    { name: 'Gemini', provider: 'Google (Gemini 1.5 Flash)', icon: '✨', cost: 'FREE' },
+                    { name: 'DeepSeek', provider: 'DeepSeek (DeepSeek Chat)', icon: '🔬', cost: '$0.14/1K' },
+                    { name: 'Mistral', provider: 'Mistral AI (Mistral Small)', icon: '🌪️', cost: '$0.20/1K' },
+                    { name: 'Groq', provider: 'Groq (Llama 3.3 70B)', icon: '⚡', cost: '$0.59/1K' },
+                    { name: 'Perplexity', provider: 'Perplexity (Sonar Small)', icon: '🔍', cost: '$0.20/1K' }
                   ].map((model) => (
                     <div key={model.name} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex items-center justify-between hover:shadow-md transition-shadow bg-white dark:bg-gray-800">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl">{model.icon}</span>
                         <div>
                           <span className="font-semibold block text-gray-900 dark:text-white">{model.name}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{model.provider}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 block">{model.provider}</span>
+                          <span className="text-xs font-medium text-indigo-600 dark:text-indigo-400">{model.cost}</span>
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" defaultChecked={['GPT', 'Claude', 'Gemini'].includes(model.name)} />
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={enabledModels[model.name] ?? false}
+                          onChange={() => toggleModel(model.name)}
+                        />
                         <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
                     </div>
@@ -846,7 +962,7 @@ export default function Admin() {
                 </div>
                 <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                   <p className="text-sm text-blue-800 dark:text-blue-300">
-                    <strong>Note:</strong> Currently using mock responses. Enable actual API integration by configuring API keys in the API Keys tab. You can select which models to include in evaluations.
+                    <strong>Note:</strong> Models will only work if their API keys are configured in Vercel Environment Variables. See the documentation for setup instructions.
                   </p>
                 </div>
               </div>

@@ -275,6 +275,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       temperature: 0.7
     };
 
+    // Get enabled models from database
+    const { data: enabledModelsData } = await supabase
+      .from('enabled_models')
+      .select('model_name, is_enabled')
+      .eq('is_enabled', true)
+      .order('display_order', { ascending: true });
+
+    // Create a set of enabled model names for quick lookup
+    const enabledModelNames = new Set(
+      enabledModelsData?.map(m => m.model_name) || ['GPT', 'Claude', 'Gemini']
+    );
+
     // Get API keys from environment variables (set in Vercel Dashboard)
     const openaiKey = process.env.OPENAI_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -286,8 +298,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const responses: AIResponse[] = [];
 
-    // Process each model (add only models you want to use)
-    const models = [
+    // All available models
+    const allModels = [
       { name: 'GPT', key: openaiKey, call: callOpenAI },
       { name: 'Claude', key: anthropicKey, call: callAnthropic },
       { name: 'Gemini', key: googleKey, call: callGoogleAI },
@@ -296,6 +308,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       { name: 'Groq', key: groqKey, call: callGroq },
       { name: 'Perplexity', key: perplexityKey, call: callPerplexity }
     ];
+
+    // Filter to only use enabled models
+    const models = allModels.filter(model => enabledModelNames.has(model.name));
+
+    console.log(`Using ${models.length} enabled models:`, Array.from(enabledModelNames));
 
     for (const model of models) {
       if (model.key) {
