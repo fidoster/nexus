@@ -412,9 +412,21 @@ export default function Dashboard() {
               {responses.length > 0 && (
                 <div className="space-y-6">
                   <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                    Rank the responses from best to worst. Models are anonymized for unbiased evaluation.
+                    {responses.length > 1
+                      ? 'Rank the responses from best to worst. Models are anonymized for unbiased evaluation.'
+                      : 'Review the AI response below. Model identity is anonymized for unbiased evaluation.'}
                   </p>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className={`grid gap-4 ${
+                    responses.length === 1
+                      ? 'grid-cols-1'
+                      : responses.length === 2
+                      ? 'md:grid-cols-2'
+                      : responses.length === 3
+                      ? 'md:grid-cols-2 lg:grid-cols-3'
+                      : responses.length === 4
+                      ? 'md:grid-cols-2 lg:grid-cols-4'
+                      : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                  }`}>
                     {responses.map((response) => (
                       <div
                         key={response.id}
@@ -442,41 +454,37 @@ export default function Dashboard() {
                           )}
                         </div>
                         <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">{response.content}</p>
-                        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Rank this response:</p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleRankingSelect(response.id, 1)}
-                              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                rankings[response.id] === 1
-                                  ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/50'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-100 dark:hover:bg-yellow-900'
-                              }`}
-                            >
-                              1st Best
-                            </button>
-                            <button
-                              onClick={() => handleRankingSelect(response.id, 2)}
-                              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                rankings[response.id] === 2
-                                  ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/50'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-cyan-100 dark:hover:bg-cyan-900'
-                              }`}
-                            >
-                              2nd Best
-                            </button>
-                            <button
-                              onClick={() => handleRankingSelect(response.id, 3)}
-                              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                rankings[response.id] === 3
-                                  ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/50'
-                                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-orange-100 dark:hover:bg-orange-900'
-                              }`}
-                            >
-                              3rd Best
-                            </button>
+                        {responses.length > 1 && (
+                          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Rank this response:</p>
+                            <div className="flex gap-2">
+                              {[...Array(Math.min(responses.length, 3))].map((_, index) => {
+                                const rank = index + 1;
+                                const rankLabels = ['1st Best', '2nd Best', '3rd Best', '4th', '5th', '6th', '7th'];
+                                const rankColors = [
+                                  { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-100 dark:hover:bg-yellow-900', shadow: 'shadow-yellow-500/50' },
+                                  { bg: 'bg-cyan-500', hover: 'hover:bg-cyan-100 dark:hover:bg-cyan-900', shadow: 'shadow-cyan-500/50' },
+                                  { bg: 'bg-orange-500', hover: 'hover:bg-orange-100 dark:hover:bg-orange-900', shadow: 'shadow-orange-500/50' }
+                                ];
+                                const color = rankColors[index] || rankColors[2];
+
+                                return (
+                                  <button
+                                    key={rank}
+                                    onClick={() => handleRankingSelect(response.id, rank)}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                      rankings[response.id] === rank
+                                        ? `${color.bg} text-white shadow-lg ${color.shadow}`
+                                        : `bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 ${color.hover}`
+                                    }`}
+                                  >
+                                    {rankLabels[index]}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
