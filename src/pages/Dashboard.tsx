@@ -250,9 +250,9 @@ export default function Dashboard() {
   return (
     <div className="flex h-screen bg-white dark:bg-gray-900 transition-colors">
       {/* Sidebar */}
-      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col`}>
+      <div className={`${showHistory ? 'block' : 'hidden'} md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-screen`}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex-shrink-0 p-4 border-b border-gray-200 dark:border-gray-700">
           <button
             onClick={handleNewChat}
             className="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-medium transition-all shadow-md flex items-center justify-center gap-2"
@@ -264,8 +264,8 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* History List */}
-        <div className="flex-1 overflow-y-auto p-3">
+        {/* History List - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-3 min-h-0">
           <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
             Recent Chats
           </h3>
@@ -296,8 +296,8 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Sidebar Footer */}
-        <div className="p-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        {/* Sidebar Footer - Always Visible */}
+        <div className="flex-shrink-0 p-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
           {isAdmin && (
             <button
               onClick={() => navigate('/admin')}
