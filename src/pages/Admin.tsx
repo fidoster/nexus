@@ -636,18 +636,35 @@ export default function Admin() {
 
   const activateSystemPrompt = async (promptId: string) => {
     try {
-      const { error } = await supabase
-        .from('system_prompts')
-        .update({ is_active: true })
-        .eq('id', promptId);
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
 
-      if (error) throw error;
+      // Call serverless function to update (avoids CORS issues)
+      const response = await fetch('/api/update-system-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          promptId,
+          action: 'activate',
+          authToken: session.access_token
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to activate prompt');
+      }
 
       alert('✅ System prompt activated!');
       await loadSystemPrompts();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error activating system prompt:', err);
-      alert('❌ Failed to activate system prompt.');
+      alert(`❌ Failed to activate system prompt: ${err.message}`);
     }
   };
 
@@ -657,12 +674,29 @@ export default function Admin() {
     }
 
     try {
-      const { error } = await supabase
-        .from('system_prompts')
-        .delete()
-        .eq('id', promptId);
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
 
-      if (error) throw error;
+      // Call serverless function to delete (avoids CORS issues)
+      const response = await fetch('/api/update-system-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          promptId,
+          action: 'delete',
+          authToken: session.access_token
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete prompt');
+      }
 
       alert('✅ System prompt deleted!');
       await loadSystemPrompts();
