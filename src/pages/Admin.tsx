@@ -285,7 +285,7 @@ export default function Admin() {
     if (selectedRatings.size === analyticsData?.allRatings?.length) {
       setSelectedRatings(new Set());
     } else {
-      const allIds = new Set(analyticsData?.allRatings?.map((r: any) => r.id));
+      const allIds = new Set<string>(analyticsData?.allRatings?.map((r: any) => r.id as string) || []);
       setSelectedRatings(allIds);
     }
   };
@@ -301,7 +301,7 @@ export default function Admin() {
     }
 
     try {
-      const { error, count } = await supabase
+      const { error } = await supabase
         .from('ratings')
         .delete()
         .in('id', Array.from(selectedRatings))
@@ -327,7 +327,7 @@ export default function Admin() {
     }
 
     try {
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('ratings')
         .delete()
         .eq('id', ratingId)
@@ -417,27 +417,28 @@ export default function Admin() {
     return sorted;
   };
 
-  const deleteQueryAndRelated = async (queryId: string) => {
-    if (!confirm('Delete this query and all its responses/ratings?')) {
-      return;
-    }
-
-    try {
-      // Responses and ratings will cascade delete due to foreign keys
-      const { error } = await supabase
-        .from('queries')
-        .delete()
-        .eq('id', queryId);
-
-      if (error) throw error;
-
-      alert('✅ Query deleted successfully!');
-      await loadAnalytics(); // Reload data
-    } catch (err) {
-      console.error('Error deleting query:', err);
-      alert('❌ Failed to delete query.');
-    }
-  };
+  // Reserved for future use - delete query with cascade
+  // const deleteQueryAndRelated = async (queryId: string) => {
+  //   if (!confirm('Delete this query and all its responses/ratings?')) {
+  //     return;
+  //   }
+  //
+  //   try {
+  //     // Responses and ratings will cascade delete due to foreign keys
+  //     const { error } = await supabase
+  //       .from('queries')
+  //       .delete()
+  //       .eq('id', queryId);
+  //
+  //     if (error) throw error;
+  //
+  //     alert('✅ Query deleted successfully!');
+  //     await loadAnalytics(); // Reload data
+  //   } catch (err) {
+  //     console.error('Error deleting query:', err);
+  //     alert('❌ Failed to delete query.');
+  //   }
+  // };
 
   // System Prompt Functions
   const loadSystemPrompts = async () => {
