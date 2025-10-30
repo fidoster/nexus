@@ -263,17 +263,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get active system prompt
-    const { data: promptData } = await supabase
+    const { data: promptData, error: promptError } = await supabase
       .from('system_prompts')
       .select('prompt_text, max_tokens, temperature')
       .eq('is_active', true)
       .maybeSingle();
+
+    if (promptError) {
+      console.error('Error fetching system prompt:', promptError);
+    }
 
     const systemPrompt: SystemPrompt = promptData || {
       prompt_text: 'You are a helpful AI assistant. Provide clear, accurate, and concise responses.',
       max_tokens: 500,
       temperature: 0.7
     };
+
+    console.log('Using system prompt:', systemPrompt.prompt_text.substring(0, 100) + '...');
 
     // Get enabled models from database
     const { data: enabledModelsData } = await supabase
