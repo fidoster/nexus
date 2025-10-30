@@ -18,6 +18,16 @@ interface APIKey {
   isActive: boolean;
 }
 
+interface SystemPrompt {
+  id: string;
+  name: string;
+  prompt_text: string;
+  max_tokens: number;
+  temperature: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics';
 
 export default function Admin() {
@@ -32,9 +42,25 @@ export default function Admin() {
   const [selectedRatings, setSelectedRatings] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'created_at', direction: 'desc' });
 
+  // System Prompt state
+  const [systemPrompts, setSystemPrompts] = useState<SystemPrompt[]>([]);
+  const [editingPrompt, setEditingPrompt] = useState<SystemPrompt | null>(null);
+  const [newPrompt, setNewPrompt] = useState({
+    name: '',
+    prompt_text: '',
+    max_tokens: 500,
+    temperature: 0.7
+  });
+
   useEffect(() => {
     checkAdminAccess();
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      loadSystemPrompts();
+    }
+  }, [activeTab]);
 
   const checkAdminAccess = async () => {
     if (!user) {
@@ -410,6 +436,114 @@ export default function Admin() {
     } catch (err) {
       console.error('Error deleting query:', err);
       alert('❌ Failed to delete query.');
+    }
+  };
+
+  // System Prompt Functions
+  const loadSystemPrompts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_prompts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSystemPrompts(data || []);
+    } catch (err) {
+      console.error('Error loading system prompts:', err);
+    }
+  };
+
+  const createSystemPrompt = async () => {
+    if (!newPrompt.name || !newPrompt.prompt_text) {
+      alert('Please fill in both name and prompt text');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('system_prompts')
+        .insert({
+          name: newPrompt.name,
+          prompt_text: newPrompt.prompt_text,
+          max_tokens: newPrompt.max_tokens,
+          temperature: newPrompt.temperature,
+          is_active: false,
+          created_by: user?.id
+        });
+
+      if (error) throw error;
+
+      alert('✅ System prompt created successfully!');
+      setNewPrompt({ name: '', prompt_text: '', max_tokens: 500, temperature: 0.7 });
+      await loadSystemPrompts();
+    } catch (err) {
+      console.error('Error creating system prompt:', err);
+      alert('❌ Failed to create system prompt.');
+    }
+  };
+
+  const updateSystemPrompt = async () => {
+    if (!editingPrompt) return;
+
+    try {
+      const { error } = await supabase
+        .from('system_prompts')
+        .update({
+          name: editingPrompt.name,
+          prompt_text: editingPrompt.prompt_text,
+          max_tokens: editingPrompt.max_tokens,
+          temperature: editingPrompt.temperature,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingPrompt.id);
+
+      if (error) throw error;
+
+      alert('✅ System prompt updated successfully!');
+      setEditingPrompt(null);
+      await loadSystemPrompts();
+    } catch (err) {
+      console.error('Error updating system prompt:', err);
+      alert('❌ Failed to update system prompt.');
+    }
+  };
+
+  const activateSystemPrompt = async (promptId: string) => {
+    try {
+      const { error } = await supabase
+        .from('system_prompts')
+        .update({ is_active: true })
+        .eq('id', promptId);
+
+      if (error) throw error;
+
+      alert('✅ System prompt activated!');
+      await loadSystemPrompts();
+    } catch (err) {
+      console.error('Error activating system prompt:', err);
+      alert('❌ Failed to activate system prompt.');
+    }
+  };
+
+  const deleteSystemPrompt = async (promptId: string) => {
+    if (!confirm('Delete this system prompt?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('system_prompts')
+        .delete()
+        .eq('id', promptId);
+
+      if (error) throw error;
+
+      alert('✅ System prompt deleted!');
+      await loadSystemPrompts();
+    } catch (err) {
+      console.error('Error deleting system prompt:', err);
+      alert('❌ Failed to delete system prompt.');
     }
   };
 
@@ -946,41 +1080,200 @@ export default function Admin() {
             {/* Settings Tab */}
             {activeTab === 'settings' && (
               <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Platform Settings</h3>
-                <div className="space-y-6">
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-                    <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Maximum Responses per Query</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">How many AI models should respond to each query</p>
-                    <input
-                      type="number"
-                      defaultValue={3}
-                      min={1}
-                      max={10}
-                      className="w-32 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                    />
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">System Prompt Management</h3>
+
+                {/* Create New Prompt */}
+                <div className="mb-8 border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+                  <h4 className="font-semibold mb-4 text-gray-900 dark:text-white text-lg">Create New System Prompt</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Prompt Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newPrompt.name}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, name: e.target.value })}
+                        placeholder="e.g., Short Responses, Academic Style, Technical Focus"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        System Prompt Text
+                      </label>
+                      <textarea
+                        value={newPrompt.prompt_text}
+                        onChange={(e) => setNewPrompt({ ...newPrompt, prompt_text: e.target.value })}
+                        placeholder="Enter the system prompt that will guide AI responses. Include instructions for tone, length, style, etc."
+                        rows={6}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Max Tokens (Response Length)
+                        </label>
+                        <input
+                          type="number"
+                          value={newPrompt.max_tokens}
+                          onChange={(e) => setNewPrompt({ ...newPrompt, max_tokens: parseInt(e.target.value) })}
+                          min={50}
+                          max={2000}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">50-2000 tokens (~40-1600 words)</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Temperature (Creativity)
+                        </label>
+                        <input
+                          type="number"
+                          value={newPrompt.temperature}
+                          onChange={(e) => setNewPrompt({ ...newPrompt, temperature: parseFloat(e.target.value) })}
+                          min={0}
+                          max={2}
+                          step={0.1}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">0.0 = Focused, 2.0 = Creative</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={createSystemPrompt}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold"
+                    >
+                      Create Prompt
+                    </button>
                   </div>
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-                    <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Allow Anonymous Submissions</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Allow students to submit queries anonymously</p>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" defaultChecked />
-                      <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                  </div>
-                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-                    <h4 className="font-semibold mb-2 text-gray-900 dark:text-white">Response Time Limit</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Maximum time to wait for AI responses (seconds)</p>
-                    <input
-                      type="number"
-                      defaultValue={30}
-                      min={10}
-                      max={120}
-                      className="w-32 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
-                    />
-                  </div>
-                  <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                    Save Settings
-                  </button>
+                </div>
+
+                {/* Existing Prompts */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-lg">Existing System Prompts</h4>
+                  {systemPrompts.length === 0 ? (
+                    <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <p className="text-gray-600 dark:text-gray-400">No system prompts found. Create one above!</p>
+                    </div>
+                  ) : (
+                    systemPrompts.map((prompt) => (
+                      <div
+                        key={prompt.id}
+                        className={`border rounded-lg p-4 ${
+                          prompt.is_active
+                            ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                        }`}
+                      >
+                        {editingPrompt?.id === prompt.id ? (
+                          <div className="space-y-4">
+                            <input
+                              type="text"
+                              value={editingPrompt.name}
+                              onChange={(e) => setEditingPrompt({ ...editingPrompt, name: e.target.value })}
+                              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                            />
+                            <textarea
+                              value={editingPrompt.prompt_text}
+                              onChange={(e) => setEditingPrompt({ ...editingPrompt, prompt_text: e.target.value })}
+                              rows={6}
+                              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                            />
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <input
+                                type="number"
+                                value={editingPrompt.max_tokens}
+                                onChange={(e) => setEditingPrompt({ ...editingPrompt, max_tokens: parseInt(e.target.value) })}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                              />
+                              <input
+                                type="number"
+                                value={editingPrompt.temperature}
+                                onChange={(e) => setEditingPrompt({ ...editingPrompt, temperature: parseFloat(e.target.value) })}
+                                step={0.1}
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={updateSystemPrompt}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingPrompt(null)}
+                                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h5 className="font-semibold text-lg text-gray-900 dark:text-white">{prompt.name}</h5>
+                                  {prompt.is_active && (
+                                    <span className="px-2 py-1 text-xs font-semibold bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full">
+                                      ACTIVE
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-3">{prompt.prompt_text}</p>
+                                <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                  <span>Max Tokens: {prompt.max_tokens}</span>
+                                  <span>Temperature: {prompt.temperature}</span>
+                                  <span>Created: {new Date(prompt.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {!prompt.is_active && (
+                                <button
+                                  onClick={() => activateSystemPrompt(prompt.id)}
+                                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                                >
+                                  Activate
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setEditingPrompt(prompt)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => deleteSystemPrompt(prompt.id)}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Info Box */}
+                <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h5 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">ℹ️ How System Prompts Work</h5>
+                  <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                    <li>• System prompts control how AI models respond to student questions</li>
+                    <li>• Only ONE prompt can be active at a time</li>
+                    <li>• Use max_tokens to limit response length (prevents overly long answers)</li>
+                    <li>• Temperature controls creativity: Lower = More focused, Higher = More creative</li>
+                    <li>• Students will not see the system prompt, only the AI responses</li>
+                  </ul>
                 </div>
               </div>
             )}
