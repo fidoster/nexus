@@ -417,7 +417,7 @@ export default function Dashboard() {
         </div>
 
         {/* History List - Scrollable with padding for header and footer */}
-        <div className="absolute top-[73px] bottom-[120px] left-0 right-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
+        <div className="absolute top-[73px] bottom-[140px] left-0 right-0 overflow-y-auto overflow-x-hidden scrollbar-thin">
           <div className="p-3">
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
               Conversations
