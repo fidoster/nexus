@@ -427,7 +427,7 @@ export default function Dashboard() {
                       ? 'Rank the responses from best to worst. Models are anonymized for unbiased evaluation.'
                       : 'Review the AI response below. Model identity is anonymized for unbiased evaluation.'}
                   </p>
-                  <div className={`grid gap-4 ${
+                  <div className={`grid gap-4 items-stretch ${
                     responses.length === 1
                       ? 'grid-cols-1'
                       : responses.length === 2
@@ -441,7 +441,7 @@ export default function Dashboard() {
                     {responses.map((response) => (
                       <div
                         key={response.id}
-                        className={`bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border-2 transition-all ${
+                        className={`bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border-2 transition-all flex flex-col h-full ${
                           rankings[response.id]
                             ? rankings[response.id] === 1
                               ? 'border-yellow-400 dark:border-yellow-500 shadow-lg shadow-yellow-500/30'
@@ -464,7 +464,9 @@ export default function Dashboard() {
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">{response.content}</p>
+                        <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 flex-1 overflow-y-auto whitespace-pre-wrap">
+                          {response.content}
+                        </div>
                         {responses.length > 1 && (
                           <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Rank this response:</p>
