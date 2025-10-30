@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent body overflow and ensure full height */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 /* Custom scrollbar styles */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
