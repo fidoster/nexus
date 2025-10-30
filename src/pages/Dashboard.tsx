@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
-import { generateAIResponses } from '../services/aiService';
+import { generateAIResponses } from '../services/aiServiceVercel';
 
 interface Query {
   id: string;
