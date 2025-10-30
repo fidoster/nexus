@@ -67,6 +67,56 @@ export default function Dashboard() {
     if (data) setHistory(data);
   };
 
+  const loadQueryResponses = async (queryId: string) => {
+    try {
+      // Load responses for this query, ordered by creation time to maintain consistent display
+      const { data: queryResponses, error } = await supabase
+        .from('responses')
+        .select('*')
+        .eq('query_id', queryId)
+        .order('created_at', { ascending: true }); // Keep consistent order
+
+      if (error) throw error;
+
+      if (queryResponses && queryResponses.length > 0) {
+        // Don't randomize when loading from history - keep the original order
+        // Assign anonymous labels in the order they were saved
+        const anonymizedResponses = queryResponses.map((resp, index) => ({
+          id: resp.id,
+          model_name: resp.model_name,
+          display_name: `Model ${String.fromCharCode(65 + index)}`,
+          content: resp.content
+        }));
+
+        setResponses(anonymizedResponses);
+
+        // Load existing rankings for this query
+        if (user) {
+          const { data: ratingsData } = await supabase
+            .from('ratings')
+            .select('response_id, ranking')
+            .eq('user_id', user.id)
+            .in('response_id', queryResponses.map(r => r.id));
+
+          if (ratingsData) {
+            const rankingsMap: { [key: string]: number } = {};
+            ratingsData.forEach(rating => {
+              rankingsMap[rating.response_id] = rating.ranking;
+            });
+            setRankings(rankingsMap);
+          }
+        }
+      } else {
+        setResponses([]);
+        setRankings({});
+      }
+    } catch (err) {
+      console.error('Error loading query responses:', err);
+      setResponses([]);
+      setRankings({});
+    }
+  };
+
   const handleSubmitQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !queryText.trim()) return;
@@ -226,9 +276,11 @@ export default function Dashboard() {
               {history.map((query) => (
                 <button
                   key={query.id}
-                  onClick={() => {
+                  onClick={async () => {
                     setCurrentQuery(query);
                     setShowHistory(false);
+                    // Load the responses for this query
+                    await loadQueryResponses(query.id);
                   }}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors group"
                 >
