@@ -705,9 +705,9 @@ export default function Dashboard() {
                               {response.content}
                             </div>
                             {group.responses.length > 1 && (
-                              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">Click to rank this response:</p>
-                                <div className="flex flex-wrap justify-center gap-3">
+                              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-2 text-center">Rank this response:</p>
+                                <div className="flex flex-wrap justify-center gap-2">
                                   {[...Array(group.responses.length)].map((_, index) => {
                                     const rank = index + 1;
                                     const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
@@ -719,19 +719,17 @@ export default function Dashboard() {
                                       <button
                                         key={rank}
                                         onClick={() => handleRankingSelect(groupIndex, response.id, rank)}
-                                        className={`group relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all ${
+                                        className={`group relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
                                           isSelected
-                                            ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400 scale-110'
-                                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 hover:scale-105'
+                                            ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400'
+                                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                                         }`}
                                         title={medalLabels[index]}
                                       >
-                                        <span className={`text-3xl transition-transform ${
-                                          isSelected ? 'scale-110 animate-pulse' : 'group-hover:scale-110'
-                                        }`}>
+                                        <span className="text-xl">
                                           {medals[index]}
                                         </span>
-                                        <span className={`text-xs font-medium whitespace-nowrap ${
+                                        <span className={`text-[10px] font-medium whitespace-nowrap ${
                                           isSelected
                                             ? 'text-indigo-700 dark:text-indigo-300'
                                             : 'text-gray-600 dark:text-gray-400'
