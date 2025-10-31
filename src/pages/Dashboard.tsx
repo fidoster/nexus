@@ -695,11 +695,24 @@ export default function Dashboard() {
                                 </div>
                                 <h4 className="font-semibold text-gray-900 dark:text-white">{response.display_name}</h4>
                               </div>
-                              {group.rankings[response.id] && (
-                                <span className="flex items-center gap-1 text-lg font-bold px-2 py-1 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400">
-                                  {['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'][group.rankings[response.id] - 1]}
-                                </span>
-                              )}
+                              {group.rankings[response.id] && (() => {
+                                const rankIndex = group.rankings[response.id] - 1;
+                                const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
+                                const badgeColors = [
+                                  { bg: 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20', ring: 'ring-yellow-400 dark:ring-yellow-500' }, // Gold
+                                  { bg: 'bg-gradient-to-br from-gray-50 to-slate-100 dark:from-gray-700/30 dark:to-slate-700/30', ring: 'ring-gray-400 dark:ring-gray-500' }, // Silver
+                                  { bg: 'bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20', ring: 'ring-orange-400 dark:ring-orange-500' }, // Bronze
+                                  { bg: 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20', ring: 'ring-blue-400 dark:ring-blue-500' }, // 4th
+                                  { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20', ring: 'ring-emerald-400 dark:ring-emerald-500' }, // 5th
+                                  { bg: 'bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20', ring: 'ring-violet-400 dark:ring-violet-500' } // 6th
+                                ];
+                                const color = badgeColors[rankIndex];
+                                return (
+                                  <span className={`flex items-center gap-1 text-lg font-bold px-2 py-1 rounded-lg ${color.bg} ring-2 ${color.ring}`}>
+                                    {medals[rankIndex]}
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 flex-1 overflow-y-auto whitespace-pre-wrap">
                               {response.content}
@@ -715,13 +728,24 @@ export default function Dashboard() {
                                     const rankText = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
                                     const isSelected = group.rankings[response.id] === rank;
 
+                                    // Medal-matching colors
+                                    const colors = [
+                                      { bg: 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20', ring: 'ring-yellow-400 dark:ring-yellow-500', text: 'text-yellow-700 dark:text-yellow-300' }, // Gold
+                                      { bg: 'bg-gradient-to-br from-gray-50 to-slate-100 dark:from-gray-700/30 dark:to-slate-700/30', ring: 'ring-gray-400 dark:ring-gray-500', text: 'text-gray-700 dark:text-gray-300' }, // Silver
+                                      { bg: 'bg-gradient-to-br from-orange-50 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20', ring: 'ring-orange-400 dark:ring-orange-500', text: 'text-orange-700 dark:text-orange-300' }, // Bronze
+                                      { bg: 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20', ring: 'ring-blue-400 dark:ring-blue-500', text: 'text-blue-700 dark:text-blue-300' }, // 4th - Blue
+                                      { bg: 'bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20', ring: 'ring-emerald-400 dark:ring-emerald-500', text: 'text-emerald-700 dark:text-emerald-300' }, // 5th - Green
+                                      { bg: 'bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20', ring: 'ring-violet-400 dark:ring-violet-500', text: 'text-violet-700 dark:text-violet-300' } // 6th - Purple
+                                    ];
+                                    const color = colors[index];
+
                                     return (
                                       <button
                                         key={rank}
                                         onClick={() => handleRankingSelect(groupIndex, response.id, rank)}
                                         className={`group relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
                                           isSelected
-                                            ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400'
+                                            ? `${color.bg} ring-2 ${color.ring}`
                                             : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                                         }`}
                                         title={medalLabels[index]}
@@ -731,7 +755,7 @@ export default function Dashboard() {
                                         </span>
                                         <span className={`text-[10px] font-medium whitespace-nowrap ${
                                           isSelected
-                                            ? 'text-indigo-700 dark:text-indigo-300'
+                                            ? color.text
                                             : 'text-gray-600 dark:text-gray-400'
                                         }`}>
                                           {rankText[index]}
