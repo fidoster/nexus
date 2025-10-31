@@ -15,7 +15,7 @@ export default function Home() {
   }, [user, navigate]);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors">
+    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors no-scrollbar">
       {/* Enhanced background with mesh gradient */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950"></div>

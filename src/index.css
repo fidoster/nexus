@@ -2,16 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Prevent body overflow and ensure full height */
+/* Ensure full height */
 html, body, #root {
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
 }
 
-/* Custom scrollbar styles - visible on hover with theme colors */
+/* Hide scrollbar on home page for professional look */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar styles - hidden by default, visible on hover */
 .scrollbar-thin {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -28,13 +37,13 @@ html, body, #root {
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3); /* Subtle by default */
+  background: transparent; /* Hidden by default */
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
-/* Show scrollbar more prominently on container hover */
+/* Show scrollbar on container hover */
 .scrollbar-thin:hover {
   scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
 }
@@ -51,11 +60,11 @@ html, body, #root {
 
 /* Dark mode scrollbar with purple theme */
 .dark .scrollbar-thin {
-  scrollbar-color: rgba(168, 85, 247, 0.3) transparent;
+  scrollbar-color: rgba(168, 85, 247, 0) transparent;
 }
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(168, 85, 247, 0.3); /* Purple theme color */
+  background: transparent; /* Hidden by default in dark mode */
 }
 
 .dark .scrollbar-thin:hover {
