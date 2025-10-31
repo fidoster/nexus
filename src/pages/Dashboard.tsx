@@ -697,7 +697,7 @@ export default function Dashboard() {
                               </div>
                               {group.rankings[response.id] && (
                                 <span className="flex items-center gap-1 text-lg font-bold px-2 py-1 rounded-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400">
-                                  {group.rankings[response.id] === 1 ? '🥇' : group.rankings[response.id] === 2 ? '🥈' : '🥉'}
+                                  {['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'][group.rankings[response.id] - 1]}
                                 </span>
                               )}
                             </div>
@@ -706,26 +706,27 @@ export default function Dashboard() {
                             </div>
                             {group.responses.length > 1 && (
                               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">Click a medal to rank this response:</p>
-                                <div className="flex justify-center gap-4">
-                                  {[...Array(Math.min(group.responses.length, 3))].map((_, index) => {
+                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-3 text-center">Click to rank this response:</p>
+                                <div className="flex flex-wrap justify-center gap-3">
+                                  {[...Array(group.responses.length)].map((_, index) => {
                                     const rank = index + 1;
-                                    const medals = ['🥇', '🥈', '🥉'];
-                                    const medalLabels = ['1st Place', '2nd Place', '3rd Place'];
+                                    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
+                                    const medalLabels = ['1st Place', '2nd Place', '3rd Place', '4th Place', '5th Place', '6th Place'];
+                                    const rankText = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
                                     const isSelected = group.rankings[response.id] === rank;
 
                                     return (
                                       <button
                                         key={rank}
                                         onClick={() => handleRankingSelect(groupIndex, response.id, rank)}
-                                        className={`group relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all ${
+                                        className={`group relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all ${
                                           isSelected
                                             ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 ring-2 ring-indigo-500 dark:ring-indigo-400 scale-110'
                                             : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 hover:scale-105'
                                         }`}
                                         title={medalLabels[index]}
                                       >
-                                        <span className={`text-4xl transition-transform ${
+                                        <span className={`text-3xl transition-transform ${
                                           isSelected ? 'scale-110 animate-pulse' : 'group-hover:scale-110'
                                         }`}>
                                           {medals[index]}
@@ -735,7 +736,7 @@ export default function Dashboard() {
                                             ? 'text-indigo-700 dark:text-indigo-300'
                                             : 'text-gray-600 dark:text-gray-400'
                                         }`}>
-                                          {rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'}
+                                          {rankText[index]}
                                         </span>
                                       </button>
                                     );
