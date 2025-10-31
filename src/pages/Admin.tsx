@@ -59,6 +59,10 @@ export default function Admin() {
   // App Settings state
   const [requireRating, setRequireRating] = useState(true);
 
+  // Pagination state for Detailed Evaluation Records
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
   // Modal state
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -1486,7 +1490,9 @@ export default function Admin() {
                             </tr>
                           </thead>
                           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {getSortedRatings().slice(0, 50).map((rating: any) => (
+                            {getSortedRatings()
+                              .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                              .map((rating: any) => (
                               <tr key={rating.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${selectedRatings.has(rating.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                                 <td className="px-4 py-3">
                                   <input
@@ -1537,13 +1543,127 @@ export default function Admin() {
                         </table>
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {analyticsData.allRatings?.length > 50
-                            ? `Showing first 50 of ${analyticsData.allRatings.length} evaluations`
-                            : `Showing all ${analyticsData.allRatings?.length || 0} evaluations`}
-                        </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {/* Pagination Controls */}
+                      <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                          {/* Left: Items per page and info */}
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <label className="text-sm text-gray-600 dark:text-gray-400">Show:</label>
+                              <select
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                  setItemsPerPage(Number(e.target.value));
+                                  setCurrentPage(1);
+                                }}
+                                className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                              >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                              </select>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, getSortedRatings().length)} to {Math.min(currentPage * itemsPerPage, getSortedRatings().length)} of {getSortedRatings().length} evaluations
+                            </p>
+                          </div>
+
+                          {/* Right: Page navigation */}
+                          <div className="flex items-center gap-2">
+                            {/* First Page */}
+                            <button
+                              onClick={() => setCurrentPage(1)}
+                              disabled={currentPage === 1}
+                              className="px-3 py-1 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="First Page"
+                            >
+                              ««
+                            </button>
+
+                            {/* Previous Page */}
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentPage === 1}
+                              className="px-3 py-1 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Previous Page"
+                            >
+                              «
+                            </button>
+
+                            {/* Page Numbers */}
+                            {(() => {
+                              const totalPages = Math.ceil(getSortedRatings().length / itemsPerPage);
+                              const pages: number[] = [];
+
+                              if (totalPages <= 5) {
+                                // Show all pages if 5 or fewer
+                                for (let i = 1; i <= totalPages; i++) pages.push(i);
+                              } else {
+                                // Show current page and 2 pages on each side
+                                const start = Math.max(1, currentPage - 2);
+                                const end = Math.min(totalPages, currentPage + 2);
+
+                                for (let i = start; i <= end; i++) pages.push(i);
+
+                                // Add first page if not included
+                                if (start > 1) {
+                                  pages.unshift(1);
+                                  if (start > 2) pages.splice(1, 0, -1); // -1 represents ellipsis
+                                }
+
+                                // Add last page if not included
+                                if (end < totalPages) {
+                                  if (end < totalPages - 1) pages.push(-1); // -1 represents ellipsis
+                                  pages.push(totalPages);
+                                }
+                              }
+
+                              return pages.map((page, idx) =>
+                                page === -1 ? (
+                                  <span key={`ellipsis-${idx}`} className="px-3 py-1 text-sm text-gray-400 dark:text-gray-500">
+                                    ...
+                                  </span>
+                                ) : (
+                                  <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`px-3 py-1 text-sm font-medium rounded-lg border transition-colors ${
+                                      currentPage === page
+                                        ? 'bg-indigo-600 border-indigo-600 text-white'
+                                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                )
+                              );
+                            })()}
+
+                            {/* Next Page */}
+                            <button
+                              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(getSortedRatings().length / itemsPerPage), prev + 1))}
+                              disabled={currentPage >= Math.ceil(getSortedRatings().length / itemsPerPage)}
+                              className="px-3 py-1 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Next Page"
+                            >
+                              »
+                            </button>
+
+                            {/* Last Page */}
+                            <button
+                              onClick={() => setCurrentPage(Math.ceil(getSortedRatings().length / itemsPerPage))}
+                              disabled={currentPage >= Math.ceil(getSortedRatings().length / itemsPerPage)}
+                              className="px-3 py-1 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              title="Last Page"
+                            >
+                              »»
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Tip at bottom */}
+                        <p className="mt-3 text-xs text-center text-gray-400 dark:text-gray-500">
                           💡 Tip: Click column headers to sort • Select rows to bulk delete
                         </p>
                       </div>
