@@ -47,3 +47,7 @@ coverage
 # Documentation and database files
 docs/
 database/
+
+# SQL migration files (run manually in Supabase)
+sql-migrations/
+*.sql
