@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
+import Modal from '../components/Modal';
 
 interface UserProfile {
   id: string;
@@ -57,6 +58,23 @@ export default function Admin() {
 
   // App Settings state
   const [requireRating, setRequireRating] = useState(true);
+
+  // Modal state
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: undefined
+  });
 
   useEffect(() => {
     checkAdminAccess();
@@ -149,7 +167,14 @@ export default function Admin() {
     );
     setAPIKeys(updated);
     localStorage.setItem('nexus_api_keys', JSON.stringify(updated));
-    alert('API key saved successfully!');
+    setModalConfig({
+      isOpen: true,
+      title: 'Success',
+      message: 'API key saved successfully!',
+      type: 'success',
+      confirmText: 'OK',
+      onConfirm: undefined
+    });
   };
 
   const updateUserRole = async (userId: string, newRole: string) => {
@@ -162,10 +187,24 @@ export default function Admin() {
       if (error) throw error;
 
       await loadAllUsers();
-      alert(`User role updated to ${newRole}`);
+      setModalConfig({
+        isOpen: true,
+        title: 'Success',
+        message: `User role updated to ${newRole}`,
+        type: 'success',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     } catch (err) {
       console.error('Error updating user role:', err);
-      alert('Failed to update user role');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to update user role',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
@@ -245,7 +284,14 @@ export default function Admin() {
       });
     } catch (err) {
       console.error('Error loading analytics:', err);
-      alert('Failed to load analytics data');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to load analytics data',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     } finally {
       setLoadingAnalytics(false);
     }
@@ -301,82 +347,149 @@ export default function Admin() {
 
   const deleteSelectedRatings = async () => {
     if (selectedRatings.size === 0) {
-      alert('Please select at least one evaluation to delete.');
+      setModalConfig({
+        isOpen: true,
+        title: 'No Selection',
+        message: 'Please select at least one evaluation to delete.',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       return;
     }
 
-    if (!confirm(`Delete ${selectedRatings.size} selected evaluation(s)? This cannot be undone.`)) {
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Evaluations',
+      message: `Delete ${selectedRatings.size} selected evaluation(s)? This cannot be undone.`,
+      type: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('ratings')
+            .delete()
+            .in('id', Array.from(selectedRatings))
+            .select();
 
-    try {
-      const { error } = await supabase
-        .from('ratings')
-        .delete()
-        .in('id', Array.from(selectedRatings))
-        .select();
+          if (error) {
+            console.error('Delete error details:', error);
+            throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+          }
 
-      if (error) {
-        console.error('Delete error details:', error);
-        throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+          setModalConfig({
+            isOpen: true,
+            title: 'Success',
+            message: `Deleted ${selectedRatings.size} evaluation(s) successfully!`,
+            type: 'success',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+          setSelectedRatings(new Set());
+          await loadAnalytics();
+        } catch (err: any) {
+          console.error('Error deleting ratings:', err);
+          setModalConfig({
+            isOpen: true,
+            title: 'Error',
+            message: `Failed to delete evaluations.\n\n${err.message || 'Unknown error'}`,
+            type: 'error',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+        }
       }
-
-      alert(`✅ Deleted ${selectedRatings.size} evaluation(s) successfully!`);
-      setSelectedRatings(new Set());
-      await loadAnalytics();
-    } catch (err: any) {
-      console.error('Error deleting ratings:', err);
-      alert(`❌ Failed to delete evaluations.\n\n${err.message || 'Unknown error'}`);
-    }
+    });
   };
 
   const deleteRating = async (ratingId: string) => {
-    if (!confirm('Delete this evaluation? This cannot be undone.')) {
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Evaluation',
+      message: 'Delete this evaluation? This cannot be undone.',
+      type: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('ratings')
+            .delete()
+            .eq('id', ratingId)
+            .select();
 
-    try {
-      const { error } = await supabase
-        .from('ratings')
-        .delete()
-        .eq('id', ratingId)
-        .select();
+          if (error) {
+            console.error('Delete error details:', error);
+            throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+          }
 
-      if (error) {
-        console.error('Delete error details:', error);
-        throw new Error(`${error.message}\n\nThis might be due to missing permissions. Please ensure RLS policies allow admins to delete ratings.`);
+          setModalConfig({
+            isOpen: true,
+            title: 'Success',
+            message: 'Evaluation deleted successfully!',
+            type: 'success',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+          await loadAnalytics();
+        } catch (err: any) {
+          console.error('Error deleting rating:', err);
+          setModalConfig({
+            isOpen: true,
+            title: 'Error',
+            message: `Failed to delete evaluation.\n\n${err.message || 'Unknown error'}`,
+            type: 'error',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+        }
       }
-
-      alert('✅ Evaluation deleted successfully!');
-      await loadAnalytics();
-    } catch (err: any) {
-      console.error('Error deleting rating:', err);
-      alert(`❌ Failed to delete evaluation.\n\n${err.message || 'Unknown error'}`);
-    }
+    });
   };
 
   const deleteAllEvaluations = async () => {
-    if (!confirm('⚠️ WARNING: This will permanently delete ALL queries, responses, and ratings. This action cannot be undone. Are you sure?')) {
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'WARNING: Delete All Data',
+      message: 'This will permanently delete ALL queries, responses, and ratings. This action cannot be undone. Are you sure?',
+      type: 'error',
+      confirmText: 'Delete Everything',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          // Delete in order: ratings → responses → queries (due to foreign keys)
+          const { error: ratingsError } = await supabase.from('ratings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (ratingsError) throw ratingsError;
 
-    try {
-      // Delete in order: ratings → responses → queries (due to foreign keys)
-      const { error: ratingsError } = await supabase.from('ratings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (ratingsError) throw ratingsError;
+          const { error: responsesError } = await supabase.from('responses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (responsesError) throw responsesError;
 
-      const { error: responsesError } = await supabase.from('responses').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (responsesError) throw responsesError;
+          const { error: queriesError } = await supabase.from('queries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+          if (queriesError) throw queriesError;
 
-      const { error: queriesError } = await supabase.from('queries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (queriesError) throw queriesError;
-
-      alert('✅ All evaluation data has been deleted successfully!');
-      setAnalyticsData(null); // Clear analytics display
-    } catch (err) {
-      console.error('Error deleting evaluations:', err);
-      alert('❌ Failed to delete evaluation data. Check console for details.');
-    }
+          setModalConfig({
+            isOpen: true,
+            title: 'Success',
+            message: 'All evaluation data has been deleted successfully!',
+            type: 'success',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+          setAnalyticsData(null); // Clear analytics display
+        } catch (err) {
+          console.error('Error deleting evaluations:', err);
+          setModalConfig({
+            isOpen: true,
+            title: 'Error',
+            message: 'Failed to delete evaluation data. Check console for details.',
+            type: 'error',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+        }
+      }
+    });
   };
 
   const sortData = (key: string) => {
@@ -534,7 +647,14 @@ export default function Admin() {
         'Groq': false,
         'Perplexity': false
       });
-      alert('⚠️ Could not load model settings. Please ensure the enabled_models table exists in Supabase.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Warning',
+        message: 'Could not load model settings. Please ensure the enabled_models table exists in Supabase.',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
@@ -577,7 +697,14 @@ export default function Admin() {
       console.log(`✅ ${modelName} ${newState ? 'enabled' : 'disabled'}`);
     } catch (err: any) {
       console.error('Error toggling model:', err);
-      alert(`❌ Failed to update ${modelName}: ${err.message}`);
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: `Failed to update ${modelName}: ${err.message}`,
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       // Revert on error
       loadEnabledModels();
     }
@@ -634,7 +761,14 @@ export default function Admin() {
       console.log(`✅ Rating requirement ${newValue ? 'enabled' : 'disabled'}`);
     } catch (err: any) {
       console.error('Error toggling setting:', err);
-      alert(`❌ Failed to update setting: ${err.message}`);
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: `Failed to update setting: ${err.message}`,
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       // Revert on error
       loadAppSettings();
     }
@@ -642,7 +776,14 @@ export default function Admin() {
 
   const createSystemPrompt = async () => {
     if (!newPrompt.name || !newPrompt.prompt_text) {
-      alert('Please fill in both name and prompt text');
+      setModalConfig({
+        isOpen: true,
+        title: 'Missing Information',
+        message: 'Please fill in both name and prompt text',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       return;
     }
 
@@ -660,12 +801,26 @@ export default function Admin() {
 
       if (error) throw error;
 
-      alert('✅ System prompt created successfully!');
+      setModalConfig({
+        isOpen: true,
+        title: 'Success',
+        message: 'System prompt created successfully!',
+        type: 'success',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       setNewPrompt({ name: '', prompt_text: '', max_tokens: 500, temperature: 0.7 });
       await loadSystemPrompts();
     } catch (err) {
       console.error('Error creating system prompt:', err);
-      alert('❌ Failed to create system prompt.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to create system prompt.',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
@@ -686,12 +841,26 @@ export default function Admin() {
 
       if (error) throw error;
 
-      alert('✅ System prompt updated successfully!');
+      setModalConfig({
+        isOpen: true,
+        title: 'Success',
+        message: 'System prompt updated successfully!',
+        type: 'success',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       setEditingPrompt(null);
       await loadSystemPrompts();
     } catch (err) {
       console.error('Error updating system prompt:', err);
-      alert('❌ Failed to update system prompt.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to update system prompt.',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
@@ -721,50 +890,84 @@ export default function Admin() {
         throw new Error(error.error || 'Failed to activate prompt');
       }
 
-      alert('✅ System prompt activated!');
+      setModalConfig({
+        isOpen: true,
+        title: 'Success',
+        message: 'System prompt activated!',
+        type: 'success',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       await loadSystemPrompts();
     } catch (err: any) {
       console.error('Error activating system prompt:', err);
-      alert(`❌ Failed to activate system prompt: ${err.message}`);
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: `Failed to activate system prompt: ${err.message}`,
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
   const deleteSystemPrompt = async (promptId: string) => {
-    if (!confirm('Delete this system prompt?')) {
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete System Prompt',
+      message: 'Delete this system prompt?',
+      type: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          // Get auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) {
+            throw new Error('Not authenticated');
+          }
 
-    try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('Not authenticated');
+          // Call serverless function to delete (avoids CORS issues)
+          const response = await fetch('/api/update-system-prompt', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              promptId,
+              action: 'delete',
+              authToken: session.access_token
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to delete prompt');
+          }
+
+          setModalConfig({
+            isOpen: true,
+            title: 'Success',
+            message: 'System prompt deleted!',
+            type: 'success',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+          await loadSystemPrompts();
+        } catch (err) {
+          console.error('Error deleting system prompt:', err);
+          setModalConfig({
+            isOpen: true,
+            title: 'Error',
+            message: 'Failed to delete system prompt.',
+            type: 'error',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+        }
       }
-
-      // Call serverless function to delete (avoids CORS issues)
-      const response = await fetch('/api/update-system-prompt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          promptId,
-          action: 'delete',
-          authToken: session.access_token
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete prompt');
-      }
-
-      alert('✅ System prompt deleted!');
-      await loadSystemPrompts();
-    } catch (err) {
-      console.error('Error deleting system prompt:', err);
-      alert('❌ Failed to delete system prompt.');
-    }
+    });
   };
 
   const handleSignOut = async () => {
@@ -784,11 +987,11 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors relative overflow-y-auto scrollbar-thin">
-      {/* Enhanced background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 dark:from-indigo-600/5 dark:to-purple-600/5 rounded-full blur-3xl"></div>
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+    <div className="h-screen bg-white dark:bg-gray-950 transition-colors relative overflow-y-auto scrollbar-thin">
+      {/* Enhanced background - fixed positioning so it doesn't interfere with scroll */}
+      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 -z-10 pointer-events-none"></div>
+      <div className="fixed top-0 right-0 w-96 h-96 bg-gradient-to-br from-indigo-400/10 to-purple-400/10 dark:from-indigo-600/5 dark:to-purple-600/5 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+      <div className="fixed inset-0 bg-[linear-gradient(rgba(99,102,241,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:64px_64px] -z-10 pointer-events-none"></div>
 
       {/* Navigation */}
       <nav className="relative bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl shadow-sm border-b border-gray-200/50 dark:border-gray-800/50 transition-colors sticky top-0 z-50">
@@ -828,7 +1031,7 @@ export default function Admin() {
         </div>
       </nav>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-full">
         {/* Welcome Section */}
         <div className="relative bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl rounded-3xl shadow-xl p-8 mb-8 border border-gray-200/50 dark:border-gray-800/50 transition-colors overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full blur-2xl"></div>
@@ -1575,6 +1778,18 @@ export default function Admin() {
           </div>
         </div>
       </div>
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+      />
     </div>
   );
 }

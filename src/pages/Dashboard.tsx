@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
+import Modal from '../components/Modal';
 import { generateAIResponses } from '../services/aiServiceVercel';
 
 interface Conversation {
@@ -57,6 +58,21 @@ export default function Dashboard() {
   const [showHistory, setShowHistory] = useState(false);
   const [requireRating, setRequireRating] = useState(true);
   const [hasRated, setHasRated] = useState(false);
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: undefined
+  });
 
   useEffect(() => {
     checkAdminStatus();
@@ -192,7 +208,14 @@ export default function Dashboard() {
 
     // Check if rating is required and user hasn't rated yet
     if (requireRating && messageGroups.length > 0 && !hasRated) {
-      alert('⚠️ Please rate the responses above before asking a new question.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Rating Required',
+        message: 'Please rate the responses above before asking a new question.',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       return;
     }
 
@@ -280,11 +303,25 @@ export default function Dashboard() {
         console.log('✅ Responses displayed to user');
       } catch (err) {
         console.error('❌ Error generating responses:', err);
-        alert('Failed to generate responses. Please try again.');
+        setModalConfig({
+          isOpen: true,
+          title: 'Error',
+          message: 'Failed to generate responses. Please try again.',
+          type: 'error',
+          confirmText: 'OK',
+          onConfirm: undefined
+        });
       }
     } catch (err) {
       console.error('Error submitting query:', err);
-      alert('Failed to submit query');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to submit query. Please try again.',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     } finally {
       setSubmitting(false);
     }
@@ -300,30 +337,43 @@ export default function Dashboard() {
   const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent clicking conversation when clicking delete
 
-    if (!confirm('Are you sure you want to delete this conversation? This will also delete all messages and responses.')) {
-      return;
-    }
+    setModalConfig({
+      isOpen: true,
+      title: 'Delete Conversation',
+      message: 'Are you sure you want to delete this conversation? This will also delete all messages and responses.',
+      type: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('conversations')
+            .delete()
+            .eq('id', conversationId);
 
-    try {
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationId);
+          if (error) throw error;
 
-      if (error) throw error;
+          // If we're deleting the current conversation, clear the view
+          if (currentConversation?.id === conversationId) {
+            handleNewChat();
+          }
 
-      // If we're deleting the current conversation, clear the view
-      if (currentConversation?.id === conversationId) {
-        handleNewChat();
+          // Reload the conversation list
+          await loadHistory();
+          console.log('✅ Conversation deleted successfully');
+        } catch (err) {
+          console.error('Error deleting conversation:', err);
+          setModalConfig({
+            isOpen: true,
+            title: 'Error',
+            message: 'Failed to delete conversation. Please try again.',
+            type: 'error',
+            confirmText: 'OK',
+            onConfirm: undefined
+          });
+        }
       }
-
-      // Reload the conversation list
-      await loadHistory();
-      console.log('✅ Conversation deleted successfully');
-    } catch (err) {
-      console.error('Error deleting conversation:', err);
-      alert('Failed to delete conversation. Please try again.');
-    }
+    });
   };
 
   const handleRankingSelect = async (groupIndex: number, responseId: string, rank: number) => {
@@ -358,7 +408,14 @@ export default function Dashboard() {
     // Check if this rank is already assigned to another response in this group
     const responseWithThisRank = Object.entries(currentRankings).find(([_, r]) => r === rank);
     if (responseWithThisRank) {
-      alert('This ranking has already been assigned to another model. Please deselect it first.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Ranking Conflict',
+        message: 'This ranking has already been assigned to another model. Please deselect it first.',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
       return;
     }
 
@@ -390,7 +447,14 @@ export default function Dashboard() {
       console.log(`Saved ranking: Response ${responseId} ranked as #${rank}`);
     } catch (err) {
       console.error('Error saving rating:', err);
-      alert('Failed to save rating. Please try again.');
+      setModalConfig({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to save rating. Please try again.',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
     }
   };
 
@@ -723,6 +787,18 @@ export default function Dashboard() {
           </form>
         </div>
       </div>
+
+      {/* Modal */}
+      <Modal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={modalConfig.onConfirm}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        confirmText={modalConfig.confirmText}
+        cancelText={modalConfig.cancelText}
+      />
     </div>
   );
 }
