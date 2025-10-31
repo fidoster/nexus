@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
+import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 interface UserProfile {
   id: string;
@@ -29,7 +30,7 @@ interface SystemPrompt {
   created_at: string;
 }
 
-type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics';
+type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics' | 'advanced-analytics';
 
 export default function Admin() {
   const { user, signOut } = useAuth();
@@ -1082,6 +1083,21 @@ export default function Admin() {
                 </span>
               </button>
               <button
+                onClick={() => setActiveTab('advanced-analytics')}
+                className={`px-6 py-4 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === 'advanced-analytics'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  Advanced Analytics
+                </span>
+              </button>
+              <button
                 onClick={() => setActiveTab('api-keys')}
                 className={`px-6 py-4 text-sm font-semibold border-b-2 transition-all ${
                   activeTab === 'api-keys'
@@ -1665,6 +1681,227 @@ export default function Admin() {
                         {/* Tip at bottom */}
                         <p className="mt-3 text-xs text-center text-gray-400 dark:text-gray-500">
                           💡 Tip: Click column headers to sort • Select rows to bulk delete
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Advanced Analytics Tab */}
+            {activeTab === 'advanced-analytics' && (
+              <div>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Advanced Analytics</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">Visual insights and data trends for research analysis</p>
+                </div>
+
+                {!analyticsData ? (
+                  <div className="text-center py-12">
+                    <button
+                      onClick={loadAnalytics}
+                      disabled={loadingAnalytics}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingAnalytics ? 'Loading Analytics...' : 'Load Advanced Analytics'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {/* Bar Chart: Model Average Ratings */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Model Performance Comparison</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ratings across all AI models</p>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <BarChart
+                          data={(() => {
+                            const modelRatings: { [key: string]: { sum: number; count: number } } = {};
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              if (!modelRatings[rating.model_name]) {
+                                modelRatings[rating.model_name] = { sum: 0, count: 0 };
+                              }
+                              modelRatings[rating.model_name].sum += rating.rating || 0;
+                              modelRatings[rating.model_name].count += 1;
+                            });
+
+                            return Object.entries(modelRatings).map(([name, data]) => ({
+                              name: name.replace('models/', ''),
+                              'Average Rating': Number((data.sum / data.count).toFixed(2)),
+                              'Total Evaluations': data.count
+                            })).sort((a, b) => b['Average Rating'] - a['Average Rating']);
+                          })()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                          <XAxis
+                            dataKey="name"
+                            angle={-45}
+                            textAnchor="end"
+                            height={100}
+                            tick={{ fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                          />
+                          <YAxis
+                            domain={[0, 5]}
+                            tick={{ fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff'
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Bar dataKey="Average Rating" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Pie Chart: Ranking Distribution */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ranking Distribution</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Medal placement frequency across all evaluations</p>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                              analyticsData.allRatings?.forEach((rating: any) => {
+                                if (rating.rank && rating.rank >= 1 && rating.rank <= 6) {
+                                  rankCounts[rating.rank]++;
+                                }
+                              });
+
+                              const labels = ['🥇 1st Place', '🥈 2nd Place', '🥉 3rd Place', '4️⃣ 4th Place', '5️⃣ 5th Place', '6️⃣ 6th Place'];
+                              const colors = ['#f59e0b', '#94a3b8', '#ea580c', '#3b82f6', '#10b981', '#8b5cf6'];
+
+                              return Object.entries(rankCounts)
+                                .filter(([_, count]) => count > 0)
+                                .map(([rank, count]) => ({
+                                  name: labels[parseInt(rank) - 1],
+                                  value: count,
+                                  color: colors[parseInt(rank) - 1]
+                                }));
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={false}
+                            label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                            outerRadius={120}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {(() => {
+                              const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                              analyticsData.allRatings?.forEach((rating: any) => {
+                                if (rating.rank && rating.rank >= 1 && rating.rank <= 6) {
+                                  rankCounts[rating.rank]++;
+                                }
+                              });
+
+                              const colors = ['#f59e0b', '#94a3b8', '#ea580c', '#3b82f6', '#10b981', '#8b5cf6'];
+
+                              return Object.entries(rankCounts)
+                                .filter(([_, count]) => count > 0)
+                                .map(([rank, _], index) => (
+                                  <Cell key={`cell-${index}`} fill={colors[parseInt(rank) - 1]} />
+                                ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff'
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Line Chart: Ratings Over Time */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rating Trends Over Time</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily average ratings showing performance trends</p>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <LineChart
+                          data={(() => {
+                            const dailyData: { [key: string]: { sum: number; count: number } } = {};
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const date = new Date(rating.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                              if (!dailyData[date]) {
+                                dailyData[date] = { sum: 0, count: 0 };
+                              }
+                              dailyData[date].sum += rating.rating || 0;
+                              dailyData[date].count += 1;
+                            });
+
+                            return Object.entries(dailyData)
+                              .map(([date, data]) => ({
+                                date,
+                                'Average Rating': Number((data.sum / data.count).toFixed(2)),
+                                'Evaluations': data.count
+                              }))
+                              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                              .slice(-30); // Last 30 days
+                          })()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                          />
+                          <YAxis
+                            domain={[0, 5]}
+                            tick={{ fill: '#6b7280' }}
+                            className="dark:fill-gray-400"
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff'
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Line
+                            type="monotone"
+                            dataKey="Average Rating"
+                            stroke="#4f46e5"
+                            strokeWidth={3}
+                            dot={{ fill: '#4f46e5', r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Summary Statistics */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Evaluations</h5>
+                        <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{analyticsData.allRatings?.length || 0}</p>
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Average Rating</h5>
+                        <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                          {analyticsData.allRatings?.length > 0
+                            ? (analyticsData.allRatings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / analyticsData.allRatings.length).toFixed(2)
+                            : '0.00'}
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Active Models</h5>
+                        <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+                          {new Set(analyticsData.allRatings?.map((r: any) => r.model_name)).size}
                         </p>
                       </div>
                     </div>
