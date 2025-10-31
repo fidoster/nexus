@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -30,7 +30,7 @@ interface SystemPrompt {
   created_at: string;
 }
 
-type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics' | 'advanced-analytics';
+type TabType = 'users' | 'api-keys' | 'settings' | 'models' | 'analytics' | 'advanced-analytics' | 'research-insights';
 
 export default function Admin() {
   const { user, signOut } = useAuth();
@@ -81,20 +81,47 @@ export default function Admin() {
     onConfirm: undefined
   });
 
-  useEffect(() => {
-    checkAdminAccess();
-  }, [user]);
+  const loadAllUsers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  useEffect(() => {
-    if (activeTab === 'settings') {
-      loadSystemPrompts();
-      loadAppSettings();
-    } else if (activeTab === 'models') {
-      loadEnabledModels();
+      console.log('Users data:', data);
+      console.log('Users error:', error);
+
+      if (error) {
+        console.error('Error loading users:', error);
+        return;
+      }
+      setUsers(data || []);
+    } catch (err) {
+      console.error('Error in loadAllUsers:', err);
     }
-  }, [activeTab]);
+  }, []);
 
-  const checkAdminAccess = async () => {
+  const loadAPIKeys = useCallback(() => {
+    // For now, load from localStorage (later we'll use Supabase)
+    const stored = localStorage.getItem('nexus_api_keys');
+    if (stored) {
+      setAPIKeys(JSON.parse(stored));
+    } else {
+      // Default empty keys
+      setAPIKeys([
+        { id: '1', service: 'OpenAI (GPT)', key: '', isActive: false },
+        { id: '2', service: 'Anthropic (Claude)', key: '', isActive: false },
+        { id: '3', service: 'Google (Gemini)', key: '', isActive: false },
+        { id: '4', service: 'Meta (Llama)', key: '', isActive: false },
+        { id: '5', service: 'Mistral AI', key: '', isActive: false },
+        { id: '6', service: 'Perplexity', key: '', isActive: false },
+        { id: '7', service: 'Cohere', key: '', isActive: false },
+        { id: '8', service: 'DeepSeek', key: '', isActive: false },
+      ]);
+    }
+  }, []);
+
+  const checkAdminAccess = useCallback(async () => {
     if (!user) {
       navigate('/login');
       return;
@@ -124,47 +151,20 @@ export default function Admin() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, navigate, loadAllUsers, loadAPIKeys]);
 
-  const loadAllUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+  useEffect(() => {
+    checkAdminAccess();
+  }, [checkAdminAccess]);
 
-      console.log('Users data:', data);
-      console.log('Users error:', error);
-
-      if (error) {
-        console.error('Error loading users:', error);
-        return;
-      }
-      setUsers(data || []);
-    } catch (err) {
-      console.error('Error in loadAllUsers:', err);
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      loadSystemPrompts();
+      loadAppSettings();
+    } else if (activeTab === 'models') {
+      loadEnabledModels();
     }
-  };
-
-  const loadAPIKeys = () => {
-    // For now, load from localStorage (later we'll use Supabase)
-    const stored = localStorage.getItem('nexus_api_keys');
-    if (stored) {
-      setAPIKeys(JSON.parse(stored));
-    } else {
-      // Default empty keys
-      setAPIKeys([
-        { id: '1', service: 'OpenAI (GPT)', key: '', isActive: false },
-        { id: '2', service: 'Anthropic (Claude)', key: '', isActive: false },
-        { id: '3', service: 'Google (Gemini)', key: '', isActive: false },
-        { id: '4', service: 'Meta (Llama)', key: '', isActive: false },
-        { id: '5', service: 'Mistral AI', key: '', isActive: false },
-        { id: '6', service: 'Perplexity', key: '', isActive: false },
-        { id: '7', service: 'Cohere', key: '', isActive: false },
-        { id: '8', service: 'DeepSeek', key: '', isActive: false },
-      ]);
-    }
-  };
+  }, [activeTab, loadSystemPrompts, loadAppSettings, loadEnabledModels]);
 
   const saveAPIKey = (id: string, key: string) => {
     const updated = apiKeys.map(item =>
@@ -568,7 +568,7 @@ export default function Admin() {
   // };
 
   // System Prompt Functions
-  const loadSystemPrompts = async () => {
+  const loadSystemPrompts = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('system_prompts')
@@ -580,7 +580,7 @@ export default function Admin() {
     } catch (err) {
       console.error('Error loading system prompts:', err);
     }
-  };
+  }, []);
 
   // Enabled Models Functions
   const initializeEnabledModels = async () => {
@@ -622,7 +622,7 @@ export default function Admin() {
     }
   };
 
-  const loadEnabledModels = async () => {
+  const loadEnabledModels = useCallback(async () => {
     try {
       // First ensure table is initialized
       await initializeEnabledModels();
@@ -661,7 +661,7 @@ export default function Admin() {
         onConfirm: undefined
       });
     }
-  };
+  }, []);
 
   const toggleModel = async (modelName: string) => {
     try {
@@ -716,7 +716,7 @@ export default function Admin() {
   };
 
   // App Settings Functions
-  const loadAppSettings = async () => {
+  const loadAppSettings = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('app_settings')
@@ -730,7 +730,7 @@ export default function Admin() {
     } catch (err) {
       console.log('App settings not found, using defaults');
     }
-  };
+  }, []);
 
   const toggleRatingRequirement = async () => {
     try {
@@ -1095,6 +1095,21 @@ export default function Admin() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
                   </svg>
                   Advanced Analytics
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('research-insights')}
+                className={`px-6 py-4 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === 'research-insights'
+                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  Research Insights
                 </span>
               </button>
               <button
@@ -2014,6 +2029,435 @@ export default function Admin() {
                         <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Active Models</h5>
                         <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
                           {new Set(analyticsData.allRatings?.map((r: any) => r.responses?.model_name).filter(Boolean)).size}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Research Insights Tab */}
+            {activeTab === 'research-insights' && (
+              <div>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Research Insights</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">Advanced metrics for deep dive analysis and research validation</p>
+                </div>
+
+                {!analyticsData ? (
+                  <div className="text-center py-12">
+                    <button
+                      onClick={loadAnalytics}
+                      disabled={loadingAnalytics}
+                      className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingAnalytics ? 'Loading Insights...' : 'Load Research Insights'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {/* Win Rate Matrix - Head to Head Comparison */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🥊 Win Rate Matrix (Head-to-Head)</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Direct comparison showing which models outperform others in the same evaluations</p>
+
+                      <div className="overflow-x-auto">
+                        {(() => {
+                          // Build head-to-head win rate matrix
+                          const modelNames = new Set<string>();
+                          const winMatrix: { [key: string]: { [key: string]: { wins: number; total: number } } } = {};
+
+                          // Group ratings by query to compare models in same evaluation
+                          const queriesMap: { [key: string]: any[] } = {};
+                          analyticsData.allRatings?.forEach((rating: any) => {
+                            const queryId = rating.responses?.query_id;
+                            const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                            if (!queryId) return;
+
+                            if (!queriesMap[queryId]) queriesMap[queryId] = [];
+                            queriesMap[queryId].push({ model: modelName, score: rating.score });
+                            modelNames.add(modelName);
+                          });
+
+                          // Calculate wins
+                          Object.values(queriesMap).forEach((ratings: any[]) => {
+                            ratings.forEach((r1: any) => {
+                              ratings.forEach((r2: any) => {
+                                if (r1.model === r2.model) return;
+
+                                if (!winMatrix[r1.model]) winMatrix[r1.model] = {};
+                                if (!winMatrix[r1.model][r2.model]) {
+                                  winMatrix[r1.model][r2.model] = { wins: 0, total: 0 };
+                                }
+
+                                winMatrix[r1.model][r2.model].total++;
+                                if (r1.score < r2.score) { // Lower score = better rank
+                                  winMatrix[r1.model][r2.model].wins++;
+                                }
+                              });
+                            });
+                          });
+
+                          const models = Array.from(modelNames).sort();
+
+                          return (
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                              <thead>
+                                <tr className="bg-gray-50 dark:bg-gray-900">
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider sticky left-0 bg-gray-50 dark:bg-gray-900">
+                                    vs →
+                                  </th>
+                                  {models.map(model => (
+                                    <th key={model} className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                      {model.substring(0, 8)}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {models.map(model1 => (
+                                  <tr key={model1} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-200 sticky left-0 bg-white dark:bg-gray-800">
+                                      {model1.substring(0, 10)}
+                                    </td>
+                                    {models.map(model2 => {
+                                      if (model1 === model2) {
+                                        return (
+                                          <td key={model2} className="px-4 py-3 text-center bg-gray-100 dark:bg-gray-700">
+                                            <span className="text-gray-400 dark:text-gray-500">—</span>
+                                          </td>
+                                        );
+                                      }
+
+                                      const data = winMatrix[model1]?.[model2];
+                                      if (!data || data.total === 0) {
+                                        return (
+                                          <td key={model2} className="px-4 py-3 text-center text-gray-400 dark:text-gray-500 text-sm">
+                                            N/A
+                                          </td>
+                                        );
+                                      }
+
+                                      const winRate = ((data.wins / data.total) * 100).toFixed(0);
+                                      const isGood = parseInt(winRate) >= 60;
+                                      const isOk = parseInt(winRate) >= 40;
+
+                                      return (
+                                        <td key={model2} className="px-4 py-3 text-center">
+                                          <div className={`inline-block px-2 py-1 rounded text-sm font-semibold ${
+                                            isGood
+                                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                                              : isOk
+                                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                                          }`}>
+                                            {winRate}%
+                                          </div>
+                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            {data.wins}/{data.total}
+                                          </div>
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          );
+                        })()}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center italic">
+                        💡 Green (≥60%) = Strong advantage | Yellow (40-59%) = Competitive | Red (&lt;40%) = Disadvantage
+                      </p>
+                    </div>
+
+                    {/* User Engagement Over Time */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">👥 User Engagement Trends</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily active evaluators and engagement patterns</p>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <LineChart
+                          data={(() => {
+                            const dailyUsers: { [key: string]: Set<string> } = {};
+                            const dailyEvals: { [key: string]: number } = {};
+
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const date = new Date(rating.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                              if (!dailyUsers[date]) {
+                                dailyUsers[date] = new Set();
+                                dailyEvals[date] = 0;
+                              }
+
+                              dailyUsers[date].add(rating.user_id);
+                              dailyEvals[date]++;
+                            });
+
+                            return Object.keys(dailyUsers)
+                              .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+                              .slice(-30)
+                              .map(date => ({
+                                date,
+                                'Active Users': dailyUsers[date].size,
+                                'Total Evaluations': dailyEvals[date]
+                              }));
+                          })()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" opacity={0.3} />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fill: '#6b7280', fontSize: 11 }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis
+                            tick={{ fill: '#6b7280', fontSize: 12 }}
+                            label={{ value: 'Count', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff'
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Line type="monotone" dataKey="Active Users" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} />
+                          <Line type="monotone" dataKey="Total Evaluations" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Query Complexity Analysis */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📝 Query Complexity vs Performance</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">How model rankings correlate with question complexity (word count)</p>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <BarChart
+                          data={(() => {
+                            const complexityBuckets: { [key: string]: { sum: number; count: number; queries: Set<string> } } = {
+                              'Short (1-10 words)': { sum: 0, count: 0, queries: new Set() },
+                              'Medium (11-25 words)': { sum: 0, count: 0, queries: new Set() },
+                              'Long (26-50 words)': { sum: 0, count: 0, queries: new Set() },
+                              'Very Long (50+ words)': { sum: 0, count: 0, queries: new Set() }
+                            };
+
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const question = rating.responses?.queries?.question || '';
+                              const wordCount = question.split(/\s+/).length;
+                              const queryId = rating.responses?.query_id;
+
+                              let bucket: string;
+                              if (wordCount <= 10) bucket = 'Short (1-10 words)';
+                              else if (wordCount <= 25) bucket = 'Medium (11-25 words)';
+                              else if (wordCount <= 50) bucket = 'Long (26-50 words)';
+                              else bucket = 'Very Long (50+ words)';
+
+                              complexityBuckets[bucket].sum += rating.score || 0;
+                              complexityBuckets[bucket].count++;
+                              if (queryId) complexityBuckets[bucket].queries.add(queryId);
+                            });
+
+                            return Object.entries(complexityBuckets).map(([name, data]) => ({
+                              name,
+                              'Average Rank': data.count > 0 ? Number((data.sum / data.count).toFixed(2)) : 0,
+                              'Unique Queries': data.queries.size,
+                              'Total Ratings': data.count
+                            }));
+                          })()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.3} />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fill: '#6b7280', fontSize: 11 }}
+                            angle={-15}
+                            textAnchor="end"
+                            height={100}
+                          />
+                          <YAxis
+                            tick={{ fill: '#6b7280', fontSize: 12 }}
+                            label={{ value: 'Avg Rank (Lower = Better)', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff'
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                          <Bar dataKey="Average Rank" fill="#10b981" radius={[8, 8, 0, 0]} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Consensus Analysis */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🤝 Consensus & Agreement Analysis</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Inter-rater reliability showing how often users agree on model rankings</p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Consensus Score */}
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-6">
+                          <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Overall Consensus Score</h5>
+                          {(() => {
+                            // Calculate how often users agree on #1 choice
+                            const queryRankings: { [key: string]: { [key: string]: number } } = {};
+
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const queryId = rating.responses?.query_id;
+                              const modelName = rating.responses?.model_name;
+                              if (!queryId || !modelName) return;
+
+                              if (!queryRankings[queryId]) queryRankings[queryId] = {};
+                              if (rating.score === 1) {
+                                queryRankings[queryId][modelName] = (queryRankings[queryId][modelName] || 0) + 1;
+                              }
+                            });
+
+                            let consensusCount = 0;
+                            let totalQueries = 0;
+
+                            Object.values(queryRankings).forEach((rankings: any) => {
+                              const votes = Object.values(rankings) as number[];
+                              if (votes.length === 0) return;
+
+                              const maxVotes = Math.max(...votes);
+                              const totalVotes = votes.reduce((a: number, b: number) => a + b, 0);
+
+                              if (totalVotes >= 2) { // Only count if multiple users rated
+                                totalQueries++;
+                                const agreement = maxVotes / totalVotes;
+                                if (agreement >= 0.6) consensusCount++; // 60%+ agreement
+                              }
+                            });
+
+                            const consensusRate = totalQueries > 0 ? ((consensusCount / totalQueries) * 100).toFixed(1) : '0.0';
+
+                            return (
+                              <>
+                                <p className="text-4xl font-bold text-indigo-600 dark:text-indigo-400">{consensusRate}%</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  {consensusCount} of {totalQueries} queries with strong agreement (≥60%)
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Agreement Distribution */}
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-6">
+                          <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">Ranking Diversity</h5>
+                          {(() => {
+                            const uniqueRankings = new Set();
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const key = `${rating.responses?.query_id}-${rating.responses?.model_name}-${rating.score}`;
+                              uniqueRankings.add(key);
+                            });
+
+                            const diversity = analyticsData.allRatings?.length > 0
+                              ? ((uniqueRankings.size / analyticsData.allRatings.length) * 100).toFixed(1)
+                              : '0.0';
+
+                            return (
+                              <>
+                                <p className="text-4xl font-bold text-green-600 dark:text-green-400">{diversity}%</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Unique ranking combinations vs total ratings
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                                  Higher = More diverse opinions
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Agreement by Model */}
+                      <div className="mt-6">
+                        <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Agreement by Model</h5>
+                        <div className="space-y-2">
+                          {(() => {
+                            const modelAgreement: { [key: string]: { agree: number; total: number } } = {};
+
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                              if (!modelAgreement[modelName]) {
+                                modelAgreement[modelName] = { agree: 0, total: 0 };
+                              }
+                              modelAgreement[modelName].total++;
+                            });
+
+                            return Object.entries(modelAgreement)
+                              .sort(([, a], [, b]) => b.total - a.total)
+                              .slice(0, 5)
+                              .map(([model, data]) => {
+                                const agreePercent = data.total > 0 ? ((data.agree / data.total) * 100).toFixed(0) : '0';
+                                return (
+                                  <div key={model} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/30 rounded p-3">
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{model}</span>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-32 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                        <div
+                                          className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all"
+                                          style={{ width: `${Math.min(parseInt(agreePercent) || 0, 100)}%` }}
+                                        ></div>
+                                      </div>
+                                      <span className="text-sm font-semibold text-gray-600 dark:text-gray-400 w-12 text-right">
+                                        {data.total}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              });
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Insights Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Queries Evaluated</h5>
+                        <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                          {new Set(analyticsData.allRatings?.map((r: any) => r.responses?.query_id).filter(Boolean)).size}
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-900/20 dark:to-blue-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Unique Evaluators</h5>
+                        <p className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">
+                          {new Set(analyticsData.allRatings?.map((r: any) => r.user_id).filter(Boolean)).size}
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Avg Ratings per Query</h5>
+                        <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                          {(() => {
+                            const uniqueQueries = new Set(analyticsData.allRatings?.map((r: any) => r.responses?.query_id).filter(Boolean)).size;
+                            return uniqueQueries > 0
+                              ? (analyticsData.allRatings?.length / uniqueQueries).toFixed(1)
+                              : '0.0';
+                          })()}
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20">
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Data Quality Score</h5>
+                        <p className="text-3xl font-bold text-rose-600 dark:text-rose-400">
+                          {(() => {
+                            const hasMultipleRatings = analyticsData.allRatings?.length >= 10;
+                            const hasMultipleUsers = new Set(analyticsData.allRatings?.map((r: any) => r.user_id)).size >= 3;
+                            const hasMultipleModels = new Set(analyticsData.allRatings?.map((r: any) => r.responses?.model_name)).size >= 2;
+
+                            const score = (hasMultipleRatings ? 33 : 0) + (hasMultipleUsers ? 33 : 0) + (hasMultipleModels ? 34 : 0);
+                            return `${score}%`;
+                          })()}
                         </p>
                       </div>
                     </div>

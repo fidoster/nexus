@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import React from 'react';
 
 // Mock Supabase
 vi.mock('../lib/supabase', () => ({
@@ -22,8 +23,31 @@ vi.mock('../lib/supabase', () => ({
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       single: vi.fn(),
+      maybeSingle: vi.fn(),
     })),
   },
+}));
+
+// Mock ThemeProvider
+vi.mock('../contexts/ThemeContext', () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  useTheme: () => ({
+    theme: 'dark',
+    toggleTheme: vi.fn(),
+  }),
+}));
+
+// Mock AuthProvider
+vi.mock('../contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAuth: () => ({
+    user: { id: 'test-user-id', email: 'test@test.com' },
+    session: { access_token: 'test-token' },
+    loading: false,
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
 }));
 
 // Mock window.matchMedia

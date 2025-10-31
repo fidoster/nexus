@@ -30,9 +30,6 @@ export default function Login() {
       console.log('User logged in:', user?.email);
 
       if (user) {
-        // Add a small delay to ensure auth state is fully updated
-        await new Promise(resolve => setTimeout(resolve, 500));
-
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')

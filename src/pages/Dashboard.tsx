@@ -9,7 +9,7 @@
 
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
@@ -74,13 +74,7 @@ export default function Dashboard() {
     onConfirm: undefined
   });
 
-  useEffect(() => {
-    checkAdminStatus();
-    loadHistory();
-    loadAppSettings();
-  }, [user]);
-
-  const checkAdminStatus = async () => {
+  const checkAdminStatus = useCallback(async () => {
     if (!user) return;
     const { data: profile } = await supabase
       .from('profiles')
@@ -88,9 +82,9 @@ export default function Dashboard() {
       .eq('id', user.id)
       .maybeSingle();
     setIsAdmin(profile?.role === 'admin');
-  };
+  }, [user]);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
       .from('conversations')
@@ -111,9 +105,9 @@ export default function Dashboard() {
       }));
       setConversations(conversationsWithSortedQueries as Conversation[]);
     }
-  };
+  }, [user]);
 
-  const loadAppSettings = async () => {
+  const loadAppSettings = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('app_settings')
@@ -127,7 +121,13 @@ export default function Dashboard() {
     } catch (err) {
       console.log('App settings not found, using defaults');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkAdminStatus();
+    loadHistory();
+    loadAppSettings();
+  }, [checkAdminStatus, loadHistory, loadAppSettings]);
 
   const loadConversationMessages = async (conversationId: string) => {
     try {
@@ -419,18 +419,12 @@ export default function Dashboard() {
       return;
     }
 
-    // Assign the ranking
+    // Prepare the new rankings
     const newRankings = { ...currentRankings, [responseId]: rank };
     const updatedGroups = [...messageGroups];
     updatedGroups[groupIndex] = { ...group, rankings: newRankings };
-    setMessageGroups(updatedGroups);
 
-    // If this is the last message group, mark as rated
-    if (groupIndex === messageGroups.length - 1) {
-      setHasRated(true);
-    }
-
-    // Save to database
+    // Save to database first
     try {
       // Use upsert to handle if user changes their ranking
       await supabase
@@ -445,6 +439,14 @@ export default function Dashboard() {
         });
 
       console.log(`Saved ranking: Response ${responseId} ranked as #${rank}`);
+
+      // Only update state after successful database save
+      setMessageGroups(updatedGroups);
+
+      // If this is the last message group, mark as rated
+      if (groupIndex === messageGroups.length - 1) {
+        setHasRated(true);
+      }
     } catch (err) {
       console.error('Error saving rating:', err);
       setModalConfig({
