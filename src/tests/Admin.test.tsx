@@ -66,8 +66,7 @@ describe('Admin Panel Functionality', () => {
       render(<Admin />, { wrapper: RouterWrapper });
 
       await waitFor(() => {
-        // Check for tab buttons
-        const tabs = [/user management/i, /analytics/i, /settings/i];
+        // Check for tab buttons (user management, analytics, settings, etc.)
         // At least some tabs should be present
         expect(screen.getByRole('main') || screen.getByText(/admin/i)).toBeInTheDocument();
       });

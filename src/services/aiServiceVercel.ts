@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * AI Service for Vercel Deployment
  * Calls Vercel serverless API route instead of direct AI APIs

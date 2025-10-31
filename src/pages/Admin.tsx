@@ -157,6 +157,77 @@ export default function Admin() {
     checkAdminAccess();
   }, [checkAdminAccess]);
 
+  const loadSystemPrompts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_prompts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSystemPrompts(data || []);
+    } catch (err) {
+      console.error('Error loading system prompts:', err);
+    }
+  }, []);
+
+  const loadEnabledModels = useCallback(async () => {
+    try {
+      // First ensure table is initialized
+      await initializeEnabledModels();
+
+      const { data, error } = await supabase
+        .from('enabled_models')
+        .select('model_name, is_enabled')
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      const modelsMap: {[key: string]: boolean} = {};
+      data?.forEach(model => {
+        modelsMap[model.model_name] = model.is_enabled;
+      });
+      setEnabledModels(modelsMap);
+      console.log('Loaded enabled models:', modelsMap);
+    } catch (err) {
+      console.error('Error loading enabled models:', err);
+      // If table doesn't exist yet, set defaults in UI
+      setEnabledModels({
+        'GPT': true,
+        'Claude': true,
+        'Gemini': true,
+        'DeepSeek': false,
+        'Mistral': false,
+        'Groq': false,
+        'Perplexity': false
+      });
+      setModalConfig({
+        isOpen: true,
+        title: 'Warning',
+        message: 'Could not load model settings. Please ensure the enabled_models table exists in Supabase.',
+        type: 'warning',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
+    }
+  }, []);
+
+  const loadAppSettings = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'require_rating_before_next_message')
+        .single();
+
+      if (data) {
+        setRequireRating(data.setting_value);
+      }
+    } catch (err) {
+      console.log('App settings not found, using defaults');
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'settings') {
       loadSystemPrompts();
@@ -568,20 +639,6 @@ export default function Admin() {
   // };
 
   // System Prompt Functions
-  const loadSystemPrompts = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('system_prompts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setSystemPrompts(data || []);
-    } catch (err) {
-      console.error('Error loading system prompts:', err);
-    }
-  }, []);
-
   // Enabled Models Functions
   const initializeEnabledModels = async () => {
     try {
@@ -621,47 +678,6 @@ export default function Admin() {
       console.error('Error initializing enabled models:', err);
     }
   };
-
-  const loadEnabledModels = useCallback(async () => {
-    try {
-      // First ensure table is initialized
-      await initializeEnabledModels();
-
-      const { data, error } = await supabase
-        .from('enabled_models')
-        .select('model_name, is_enabled')
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-
-      const modelsMap: {[key: string]: boolean} = {};
-      data?.forEach(model => {
-        modelsMap[model.model_name] = model.is_enabled;
-      });
-      setEnabledModels(modelsMap);
-      console.log('Loaded enabled models:', modelsMap);
-    } catch (err) {
-      console.error('Error loading enabled models:', err);
-      // If table doesn't exist yet, set defaults in UI
-      setEnabledModels({
-        'GPT': true,
-        'Claude': true,
-        'Gemini': true,
-        'DeepSeek': false,
-        'Mistral': false,
-        'Groq': false,
-        'Perplexity': false
-      });
-      setModalConfig({
-        isOpen: true,
-        title: 'Warning',
-        message: 'Could not load model settings. Please ensure the enabled_models table exists in Supabase.',
-        type: 'warning',
-        confirmText: 'OK',
-        onConfirm: undefined
-      });
-    }
-  }, []);
 
   const toggleModel = async (modelName: string) => {
     try {
@@ -716,22 +732,6 @@ export default function Admin() {
   };
 
   // App Settings Functions
-  const loadAppSettings = useCallback(async () => {
-    try {
-      const { data } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'require_rating_before_next_message')
-        .single();
-
-      if (data) {
-        setRequireRating(data.setting_value);
-      }
-    } catch (err) {
-      console.log('App settings not found, using defaults');
-    }
-  }, []);
-
   const toggleRatingRequirement = async () => {
     try {
       const newValue = !requireRating;
@@ -2293,7 +2293,7 @@ export default function Admin() {
                           />
                           <Legend wrapperStyle={{ paddingTop: '10px' }} />
                           <Bar dataKey="Average Rank" fill="#10b981" radius={[8, 8, 0, 0]} />
-                        </LineChart>
+                        </BarChart>
                       </ResponsiveContainer>
                     </div>
 

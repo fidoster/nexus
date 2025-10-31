@@ -68,7 +68,7 @@ describe('API Integration Tests', () => {
         eq: mockEq,
       } as any);
 
-      const result = await supabase
+      await supabase
         .from('ratings')
         .update({ rating: 5 })
         .eq('id', 'rating-123');
@@ -197,7 +197,7 @@ describe('API Integration Tests', () => {
       expect(queryResult.data?.id).toBe(queryId);
 
       // Create responses
-      const responsesResult = await supabase
+      await supabase
         .from('responses')
         .insert(responses);
 
