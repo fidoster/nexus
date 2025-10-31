@@ -1710,124 +1710,227 @@ export default function Admin() {
                 ) : (
                   <div className="space-y-8">
                     {/* Bar Chart: Model Average Rankings */}
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Model Performance Comparison</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ranking across all evaluations (lower is better)</p>
-                      <ResponsiveContainer width="100%" height={400}>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🏆 Model Performance Comparison</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ranking across all evaluations • Lower rank = Better performance</p>
+                      <ResponsiveContainer width="100%" height={450}>
                         <BarChart
                           data={(() => {
-                            return Object.values(analyticsData.modelStats)
-                              .map((model: any) => ({
+                            const models = Object.values(analyticsData.modelStats)
+                              .map((model: any, index: number) => ({
                                 name: model.name.replace('models/', ''),
                                 'Average Rank': parseFloat(model.averageRank),
                                 'Total Evaluations': model.totalRatings,
                                 '1st Place': model.rankings[1],
                                 '2nd Place': model.rankings[2],
-                                '3rd Place': model.rankings[3]
+                                '3rd Place': model.rankings[3],
+                                color: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 6]
                               }))
                               .sort((a, b) => a['Average Rank'] - b['Average Rank']);
+                            return models;
                           })()}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                          margin={{ top: 20, right: 30, left: 80, bottom: 80 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" opacity={0.3} />
                           <XAxis
                             dataKey="name"
                             angle={-45}
                             textAnchor="end"
                             height={100}
-                            tick={{ fill: '#6b7280' }}
+                            tick={{ fill: '#6b7280', fontSize: 12 }}
                             className="dark:fill-gray-400"
                           />
                           <YAxis
                             domain={[0, 3]}
-                            tick={{ fill: '#6b7280' }}
+                            tick={{ fill: '#6b7280', fontSize: 12 }}
                             className="dark:fill-gray-400"
-                            label={{ value: 'Average Rank (lower = better)', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
+                            width={70}
+                            label={{
+                              value: 'Lower = Better',
+                              angle: -90,
+                              position: 'insideLeft',
+                              fill: '#6b7280',
+                              style: { fontSize: 12 }
+                            }}
                           />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: '#1f2937',
                               border: '1px solid #374151',
                               borderRadius: '8px',
-                              color: '#fff'
+                              color: '#fff',
+                              padding: '12px'
                             }}
+                            cursor={{ fill: 'rgba(79, 70, 229, 0.1)' }}
                           />
                           <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                          <Bar dataKey="Average Rank" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                          <Bar
+                            dataKey="Average Rank"
+                            radius={[8, 8, 0, 0]}
+                            maxBarSize={60}
+                          >
+                            {(() => {
+                              const models = Object.values(analyticsData.modelStats);
+                              const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                              return models.map((_: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={colors[index % 6]} />
+                              ));
+                            })()}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
 
-                    {/* Pie Chart: Ranking Distribution */}
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ranking Distribution</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Medal placement frequency across all evaluations</p>
-                      <ResponsiveContainer width="100%" height={400}>
-                        <PieChart>
-                          <Pie
-                            data={(() => {
-                              const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-                              analyticsData.allRatings?.forEach((rating: any) => {
-                                const score = rating.score;
-                                if (score && score >= 1 && score <= 6) {
-                                  rankCounts[score]++;
-                                }
-                              });
+                    {/* Pie Chart: Ranking Distribution by Model */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🥇 Ranking Distribution by Model</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Medal placement breakdown showing which models win each rank</p>
 
-                              const labels = ['🥇 1st Place', '🥈 2nd Place', '🥉 3rd Place', '4️⃣ 4th Place', '5️⃣ 5th Place', '6️⃣ 6th Place'];
-                              const colors = ['#f59e0b', '#94a3b8', '#ea580c', '#3b82f6', '#10b981', '#8b5cf6'];
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Pie Chart */}
+                        <ResponsiveContainer width="100%" height={400}>
+                          <PieChart>
+                            <Pie
+                              data={(() => {
+                                const modelRankings: { [key: string]: { [rank: number]: number } } = {};
 
-                              return Object.entries(rankCounts)
-                                .filter(([_, count]) => count > 0)
-                                .map(([rank, count]) => ({
-                                  name: labels[parseInt(rank) - 1],
-                                  value: count,
-                                  color: colors[parseInt(rank) - 1]
-                                }));
-                            })()}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                            outerRadius={120}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {(() => {
-                              const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-                              analyticsData.allRatings?.forEach((rating: any) => {
-                                const score = rating.score;
-                                if (score && score >= 1 && score <= 6) {
-                                  rankCounts[score]++;
-                                }
-                              });
+                                analyticsData.allRatings?.forEach((rating: any) => {
+                                  const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                                  const score = rating.score;
 
-                              const colors = ['#f59e0b', '#94a3b8', '#ea580c', '#3b82f6', '#10b981', '#8b5cf6'];
+                                  if (!modelRankings[modelName]) {
+                                    modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                                  }
 
-                              return Object.entries(rankCounts)
-                                .filter(([_, count]) => count > 0)
-                                .map(([rank, _], index) => (
-                                  <Cell key={`cell-${index}`} fill={colors[parseInt(rank) - 1]} />
-                                ));
-                            })()}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: '#1f2937',
-                              border: '1px solid #374151',
-                              borderRadius: '8px',
-                              color: '#fff'
-                            }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
+                                  if (score && score >= 1 && score <= 6) {
+                                    modelRankings[modelName][score]++;
+                                  }
+                                });
+
+                                const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
+                                const chartData: any[] = [];
+
+                                Object.entries(modelRankings).forEach(([modelName, ranks], modelIndex) => {
+                                  Object.entries(ranks).forEach(([rank, count]) => {
+                                    if (count > 0) {
+                                      const rankEmojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
+                                      chartData.push({
+                                        name: `${modelName} - ${rankEmojis[parseInt(rank) - 1]}`,
+                                        value: count,
+                                        modelName,
+                                        rank: parseInt(rank),
+                                        color: colors[modelIndex % colors.length]
+                                      });
+                                    }
+                                  });
+                                });
+
+                                return chartData;
+                              })()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={true}
+                              label={({ name, percent }: any) => `${name} (${(percent * 100).toFixed(1)}%)`}
+                              outerRadius={130}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {(() => {
+                                const modelRankings: { [key: string]: { [rank: number]: number } } = {};
+
+                                analyticsData.allRatings?.forEach((rating: any) => {
+                                  const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                                  const score = rating.score;
+
+                                  if (!modelRankings[modelName]) {
+                                    modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+                                  }
+
+                                  if (score && score >= 1 && score <= 6) {
+                                    modelRankings[modelName][score]++;
+                                  }
+                                });
+
+                                const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
+                                const cells: any[] = [];
+
+                                Object.entries(modelRankings).forEach(([_, ranks], modelIndex) => {
+                                  Object.entries(ranks).forEach(([__, count], rankIndex) => {
+                                    if (count > 0) {
+                                      cells.push(
+                                        <Cell key={`cell-${modelIndex}-${rankIndex}`} fill={colors[modelIndex % colors.length]} />
+                                      );
+                                    }
+                                  });
+                                });
+
+                                return cells;
+                              })()}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: '#1f2937',
+                                border: '1px solid #374151',
+                                borderRadius: '8px',
+                                color: '#fff',
+                                padding: '12px'
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+
+                        {/* Legend with detailed breakdown */}
+                        <div className="space-y-3">
+                          <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Model Rankings Breakdown</h5>
+                          {(() => {
+                            const modelRankings: { [key: string]: { [rank: number]: number; total: number } } = {};
+
+                            analyticsData.allRatings?.forEach((rating: any) => {
+                              const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                              const score = rating.score;
+
+                              if (!modelRankings[modelName]) {
+                                modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, total: 0 };
+                              }
+
+                              if (score && score >= 1 && score <= 6) {
+                                modelRankings[modelName][score]++;
+                                modelRankings[modelName].total++;
+                              }
+                            });
+
+                            const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
+
+                            return Object.entries(modelRankings).map(([modelName, ranks], index) => (
+                              <div key={modelName} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div
+                                    className="w-3 h-3 rounded-full"
+                                    style={{ backgroundColor: colors[index % colors.length] }}
+                                  ></div>
+                                  <span className="font-semibold text-sm text-gray-900 dark:text-white">{modelName}</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">({ranks.total} total)</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 text-xs">
+                                  {ranks[1] > 0 && <span className="text-yellow-600 dark:text-yellow-400">🥇 {ranks[1]}</span>}
+                                  {ranks[2] > 0 && <span className="text-gray-600 dark:text-gray-400">🥈 {ranks[2]}</span>}
+                                  {ranks[3] > 0 && <span className="text-orange-600 dark:text-orange-400">🥉 {ranks[3]}</span>}
+                                  {ranks[4] > 0 && <span className="text-blue-600 dark:text-blue-400">4️⃣ {ranks[4]}</span>}
+                                  {ranks[5] > 0 && <span className="text-green-600 dark:text-green-400">5️⃣ {ranks[5]}</span>}
+                                  {ranks[6] > 0 && <span className="text-purple-600 dark:text-purple-400">6️⃣ {ranks[6]}</span>}
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Line Chart: Rankings Over Time */}
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ranking Trends Over Time</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily average rankings showing performance trends (lower is better)</p>
-                      <ResponsiveContainer width="100%" height={400}>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📈 Ranking Trends Over Time</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily average rankings showing performance trends • Lower rank = Better performance</p>
+                      <ResponsiveContainer width="100%" height={450}>
                         <LineChart
                           data={(() => {
                             const dailyData: { [key: string]: { sum: number; count: number } } = {};
@@ -1849,26 +1952,37 @@ export default function Admin() {
                               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                               .slice(-30); // Last 30 days
                           })()}
-                          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                          margin={{ top: 20, right: 30, left: 80, bottom: 60 }}
                         >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:stroke-gray-700" opacity={0.3} />
                           <XAxis
                             dataKey="date"
-                            tick={{ fill: '#6b7280' }}
+                            tick={{ fill: '#6b7280', fontSize: 11 }}
                             className="dark:fill-gray-400"
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
                           />
                           <YAxis
                             domain={[0, 3]}
-                            tick={{ fill: '#6b7280' }}
+                            tick={{ fill: '#6b7280', fontSize: 12 }}
                             className="dark:fill-gray-400"
-                            label={{ value: 'Average Rank (lower = better)', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
+                            width={70}
+                            label={{
+                              value: 'Lower = Better',
+                              angle: -90,
+                              position: 'insideLeft',
+                              fill: '#6b7280',
+                              style: { fontSize: 12 }
+                            }}
                           />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: '#1f2937',
                               border: '1px solid #374151',
                               borderRadius: '8px',
-                              color: '#fff'
+                              color: '#fff',
+                              padding: '12px'
                             }}
                           />
                           <Legend wrapperStyle={{ paddingTop: '20px' }} />
@@ -1877,8 +1991,8 @@ export default function Admin() {
                             dataKey="Average Rank"
                             stroke="#4f46e5"
                             strokeWidth={3}
-                            dot={{ fill: '#4f46e5', r: 4 }}
-                            activeDot={{ r: 6 }}
+                            dot={{ fill: '#4f46e5', r: 5, strokeWidth: 2, stroke: '#fff' }}
+                            activeDot={{ r: 7, strokeWidth: 2, stroke: '#fff' }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
