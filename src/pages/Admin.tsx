@@ -1712,21 +1712,26 @@ export default function Admin() {
                     {/* Bar Chart: Model Average Rankings */}
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
                       <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🏆 Model Performance Comparison</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ranking across all evaluations • Lower rank = Better performance</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Performance score across all evaluations • Higher bar = Better performance</p>
                       <ResponsiveContainer width="100%" height={450}>
                         <BarChart
                           data={(() => {
                             const models = Object.values(analyticsData.modelStats)
-                              .map((model: any, index: number) => ({
-                                name: model.name.replace('models/', ''),
-                                'Average Rank': parseFloat(model.averageRank),
-                                'Total Evaluations': model.totalRatings,
-                                '1st Place': model.rankings[1],
-                                '2nd Place': model.rankings[2],
-                                '3rd Place': model.rankings[3],
-                                color: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 6]
-                              }))
-                              .sort((a, b) => a['Average Rank'] - b['Average Rank']);
+                              .map((model: any, index: number) => {
+                                // Invert the rank: 1st place (1.0) becomes 3.0, 3rd place (3.0) becomes 1.0
+                                const invertedScore = 4 - parseFloat(model.averageRank);
+                                return {
+                                  name: model.name.replace('models/', ''),
+                                  'Performance Score': Number(invertedScore.toFixed(2)),
+                                  'Average Rank': parseFloat(model.averageRank),
+                                  'Total Evaluations': model.totalRatings,
+                                  '1st Place': model.rankings[1],
+                                  '2nd Place': model.rankings[2],
+                                  '3rd Place': model.rankings[3],
+                                  color: ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 6]
+                                };
+                              })
+                              .sort((a, b) => b['Performance Score'] - a['Performance Score']);
                             return models;
                           })()}
                           margin={{ top: 20, right: 30, left: 80, bottom: 80 }}
@@ -1746,10 +1751,10 @@ export default function Admin() {
                             className="dark:fill-gray-400"
                             width={70}
                             label={{
-                              value: 'Lower = Better',
+                              value: 'Higher = Better',
                               angle: -90,
                               position: 'insideLeft',
-                              fill: '#6b7280',
+                              fill: '#9ca3af',
                               style: { fontSize: 12 }
                             }}
                           />
@@ -1762,13 +1767,19 @@ export default function Admin() {
                               padding: '12px'
                             }}
                             cursor={{ fill: 'rgba(79, 70, 229, 0.1)' }}
+                            formatter={(value: any, name: string, props: any) => {
+                              if (name === 'Performance Score') {
+                                return [`${value} (Avg Rank: ${props.payload['Average Rank']})`, 'Performance'];
+                              }
+                              return [value, name];
+                            }}
                           />
                           <Legend
                             wrapperStyle={{ paddingTop: '20px' }}
                             formatter={(value: string) => <span className="text-gray-700 dark:text-gray-300">{value}</span>}
                           />
                           <Bar
-                            dataKey="Average Rank"
+                            dataKey="Performance Score"
                             radius={[8, 8, 0, 0]}
                             maxBarSize={60}
                           >
@@ -1809,7 +1820,16 @@ export default function Admin() {
                                 if (score === 3) modelData[modelName].thirdPlace++;
                               });
 
-                              const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
+                              const colors = [
+                                'rgba(79, 70, 229, 0.85)',    // Indigo
+                                'rgba(6, 182, 212, 0.85)',    // Cyan
+                                'rgba(16, 185, 129, 0.85)',   // Green
+                                'rgba(245, 158, 11, 0.85)',   // Amber
+                                'rgba(239, 68, 68, 0.85)',    // Red
+                                'rgba(139, 92, 246, 0.85)',   // Purple
+                                'rgba(236, 72, 153, 0.85)',   // Pink
+                                'rgba(249, 115, 22, 0.85)'    // Orange
+                              ];
 
                               return Object.entries(modelData)
                                 .map(([name, data], index) => {
@@ -1831,11 +1851,15 @@ export default function Admin() {
                             })()}
                             cx="50%"
                             cy="50%"
-                            labelLine={true}
-                            label={({ name, percent, value }: any) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                            labelLine={false}
+                            label={({ name, percent }: any) => {
+                              const percentText = (percent * 100).toFixed(1);
+                              return `${name} (${percentText}%)`;
+                            }}
                             outerRadius={140}
                             fill="#8884d8"
                             dataKey="value"
+                            style={{ fontSize: '13px', fontWeight: '500' }}
                           >
                             {(() => {
                               const modelData: { [key: string]: { total: number } } = {};
@@ -1848,7 +1872,16 @@ export default function Admin() {
                                 modelData[modelName].total++;
                               });
 
-                              const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
+                              const colors = [
+                                'rgba(79, 70, 229, 0.85)',
+                                'rgba(6, 182, 212, 0.85)',
+                                'rgba(16, 185, 129, 0.85)',
+                                'rgba(245, 158, 11, 0.85)',
+                                'rgba(239, 68, 68, 0.85)',
+                                'rgba(139, 92, 246, 0.85)',
+                                'rgba(236, 72, 153, 0.85)',
+                                'rgba(249, 115, 22, 0.85)'
+                              ];
 
                               return Object.entries(modelData)
                                 .sort(([, a], [, b]) => b.total - a.total)
@@ -1865,17 +1898,18 @@ export default function Admin() {
                               color: '#fff',
                               padding: '12px'
                             }}
-                            formatter={(value: any, _name: any, props: any) => {
-                              const { firstPlace, secondPlace, thirdPlace } = props.payload;
-                              return [
-                                <div key="tooltip">
-                                  <div className="font-semibold mb-1">Total: {value}</div>
-                                  {firstPlace > 0 && <div className="text-yellow-400">🥇 1st: {firstPlace}</div>}
-                                  {secondPlace > 0 && <div className="text-gray-300">🥈 2nd: {secondPlace}</div>}
-                                  {thirdPlace > 0 && <div className="text-orange-400">🥉 3rd: {thirdPlace}</div>}
-                                </div>,
-                                ''
-                              ];
+                            content={({ payload }: any) => {
+                              if (!payload || !payload[0]) return null;
+                              const { name, value, firstPlace, secondPlace, thirdPlace } = payload[0].payload;
+                              return (
+                                <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl">
+                                  <div className="font-semibold mb-2 text-white text-sm">{name}</div>
+                                  <div className="font-bold mb-2 text-indigo-400">Total {value}</div>
+                                  {firstPlace > 0 && <div className="text-yellow-400 text-sm">🥇 1st {firstPlace}</div>}
+                                  {secondPlace > 0 && <div className="text-gray-300 text-sm">🥈 2nd {secondPlace}</div>}
+                                  {thirdPlace > 0 && <div className="text-orange-400 text-sm">🥉 3rd {thirdPlace}</div>}
+                                </div>
+                              );
                             }}
                           />
                           <Legend
