@@ -1763,7 +1763,10 @@ export default function Admin() {
                             }}
                             cursor={{ fill: 'rgba(79, 70, 229, 0.1)' }}
                           />
-                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Legend
+                            wrapperStyle={{ paddingTop: '20px' }}
+                            formatter={(value: string) => <span className="text-gray-700 dark:text-gray-300">{value}</span>}
+                          />
                           <Bar
                             dataKey="Average Rank"
                             radius={[8, 8, 0, 0]}
@@ -1781,149 +1784,106 @@ export default function Admin() {
                       </ResponsiveContainer>
                     </div>
 
-                    {/* Pie Chart: Ranking Distribution by Model */}
+                    {/* Pie Chart: Model Evaluation Distribution */}
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">🥇 Ranking Distribution by Model</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Medal placement breakdown showing which models win each rank</p>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">📊 Model Evaluation Distribution</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Total evaluations per model with performance highlights</p>
 
-                      <div className="grid md:grid-cols-2 gap-6">
-                        {/* Pie Chart */}
-                        <ResponsiveContainer width="100%" height={400}>
-                          <PieChart>
-                            <Pie
-                              data={(() => {
-                                const modelRankings: { [key: string]: { [rank: number]: number } } = {};
+                      <ResponsiveContainer width="100%" height={450}>
+                        <PieChart>
+                          <Pie
+                            data={(() => {
+                              const modelData: { [key: string]: { total: number; firstPlace: number; secondPlace: number; thirdPlace: number } } = {};
 
-                                analyticsData.allRatings?.forEach((rating: any) => {
-                                  const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
-                                  const score = rating.score;
+                              analyticsData.allRatings?.forEach((rating: any) => {
+                                const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                                const score = rating.score;
 
-                                  if (!modelRankings[modelName]) {
-                                    modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-                                  }
+                                if (!modelData[modelName]) {
+                                  modelData[modelName] = { total: 0, firstPlace: 0, secondPlace: 0, thirdPlace: 0 };
+                                }
 
-                                  if (score && score >= 1 && score <= 6) {
-                                    modelRankings[modelName][score]++;
-                                  }
-                                });
+                                modelData[modelName].total++;
+                                if (score === 1) modelData[modelName].firstPlace++;
+                                if (score === 2) modelData[modelName].secondPlace++;
+                                if (score === 3) modelData[modelName].thirdPlace++;
+                              });
 
-                                const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
-                                const chartData: any[] = [];
+                              const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
 
-                                Object.entries(modelRankings).forEach(([modelName, ranks], modelIndex) => {
-                                  Object.entries(ranks).forEach(([rank, count]) => {
-                                    if (count > 0) {
-                                      const rankEmojis = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣'];
-                                      chartData.push({
-                                        name: `${modelName} - ${rankEmojis[parseInt(rank) - 1]}`,
-                                        value: count,
-                                        modelName,
-                                        rank: parseInt(rank),
-                                        color: colors[modelIndex % colors.length]
-                                      });
-                                    }
-                                  });
-                                });
+                              return Object.entries(modelData)
+                                .map(([name, data], index) => {
+                                  let badge = '';
+                                  if (data.firstPlace > 0) badge = ' 🥇';
+                                  else if (data.secondPlace > 0) badge = ' 🥈';
+                                  else if (data.thirdPlace > 0) badge = ' 🥉';
 
-                                return chartData;
-                              })()}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={true}
-                              label={({ name, percent }: any) => `${name} (${(percent * 100).toFixed(1)}%)`}
-                              outerRadius={130}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {(() => {
-                                const modelRankings: { [key: string]: { [rank: number]: number } } = {};
+                                  return {
+                                    name: name + badge,
+                                    value: data.total,
+                                    color: colors[index % colors.length],
+                                    firstPlace: data.firstPlace,
+                                    secondPlace: data.secondPlace,
+                                    thirdPlace: data.thirdPlace
+                                  };
+                                })
+                                .sort((a, b) => b.value - a.value);
+                            })()}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={({ name, percent, value }: any) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                            outerRadius={140}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {(() => {
+                              const modelData: { [key: string]: { total: number } } = {};
 
-                                analyticsData.allRatings?.forEach((rating: any) => {
-                                  const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
-                                  const score = rating.score;
+                              analyticsData.allRatings?.forEach((rating: any) => {
+                                const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
+                                if (!modelData[modelName]) {
+                                  modelData[modelName] = { total: 0 };
+                                }
+                                modelData[modelName].total++;
+                              });
 
-                                  if (!modelRankings[modelName]) {
-                                    modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-                                  }
+                              const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
 
-                                  if (score && score >= 1 && score <= 6) {
-                                    modelRankings[modelName][score]++;
-                                  }
-                                });
-
-                                const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
-                                const cells: any[] = [];
-
-                                Object.entries(modelRankings).forEach(([_, ranks], modelIndex) => {
-                                  Object.entries(ranks).forEach(([__, count], rankIndex) => {
-                                    if (count > 0) {
-                                      cells.push(
-                                        <Cell key={`cell-${modelIndex}-${rankIndex}`} fill={colors[modelIndex % colors.length]} />
-                                      );
-                                    }
-                                  });
-                                });
-
-                                return cells;
-                              })()}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{
-                                backgroundColor: '#1f2937',
-                                border: '1px solid #374151',
-                                borderRadius: '8px',
-                                color: '#fff',
-                                padding: '12px'
-                              }}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-
-                        {/* Legend with detailed breakdown */}
-                        <div className="space-y-3">
-                          <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Model Rankings Breakdown</h5>
-                          {(() => {
-                            const modelRankings: { [key: string]: { [rank: number]: number; total: number } } = {};
-
-                            analyticsData.allRatings?.forEach((rating: any) => {
-                              const modelName = rating.responses?.model_name?.replace('models/', '') || 'Unknown';
-                              const score = rating.score;
-
-                              if (!modelRankings[modelName]) {
-                                modelRankings[modelName] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, total: 0 };
-                              }
-
-                              if (score && score >= 1 && score <= 6) {
-                                modelRankings[modelName][score]++;
-                                modelRankings[modelName].total++;
-                              }
-                            });
-
-                            const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#f97316'];
-
-                            return Object.entries(modelRankings).map(([modelName, ranks], index) => (
-                              <div key={modelName} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{ backgroundColor: colors[index % colors.length] }}
-                                  ></div>
-                                  <span className="font-semibold text-sm text-gray-900 dark:text-white">{modelName}</span>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">({ranks.total} total)</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-1 text-xs">
-                                  {ranks[1] > 0 && <span className="text-yellow-600 dark:text-yellow-400">🥇 {ranks[1]}</span>}
-                                  {ranks[2] > 0 && <span className="text-gray-600 dark:text-gray-400">🥈 {ranks[2]}</span>}
-                                  {ranks[3] > 0 && <span className="text-orange-600 dark:text-orange-400">🥉 {ranks[3]}</span>}
-                                  {ranks[4] > 0 && <span className="text-blue-600 dark:text-blue-400">4️⃣ {ranks[4]}</span>}
-                                  {ranks[5] > 0 && <span className="text-green-600 dark:text-green-400">5️⃣ {ranks[5]}</span>}
-                                  {ranks[6] > 0 && <span className="text-purple-600 dark:text-purple-400">6️⃣ {ranks[6]}</span>}
-                                </div>
-                              </div>
-                            ));
-                          })()}
-                        </div>
-                      </div>
+                              return Object.entries(modelData)
+                                .sort(([, a], [, b]) => b.total - a.total)
+                                .map(([_, __], index) => (
+                                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                                ));
+                            })()}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1f2937',
+                              border: '1px solid #374151',
+                              borderRadius: '8px',
+                              color: '#fff',
+                              padding: '12px'
+                            }}
+                            formatter={(value: any, _name: any, props: any) => {
+                              const { firstPlace, secondPlace, thirdPlace } = props.payload;
+                              return [
+                                <div key="tooltip">
+                                  <div className="font-semibold mb-1">Total: {value}</div>
+                                  {firstPlace > 0 && <div className="text-yellow-400">🥇 1st: {firstPlace}</div>}
+                                  {secondPlace > 0 && <div className="text-gray-300">🥈 2nd: {secondPlace}</div>}
+                                  {thirdPlace > 0 && <div className="text-orange-400">🥉 3rd: {thirdPlace}</div>}
+                                </div>,
+                                ''
+                              ];
+                            }}
+                          />
+                          <Legend
+                            wrapperStyle={{ paddingTop: '30px' }}
+                            formatter={(value: string) => <span className="text-gray-700 dark:text-gray-300 text-sm">{value}</span>}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
                     </div>
 
                     {/* Line Chart: Rankings Over Time */}
@@ -1985,7 +1945,10 @@ export default function Admin() {
                               padding: '12px'
                             }}
                           />
-                          <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                          <Legend
+                            wrapperStyle={{ paddingTop: '20px' }}
+                            formatter={(value: string) => <span className="text-gray-700 dark:text-gray-300">{value}</span>}
+                          />
                           <Line
                             type="monotone"
                             dataKey="Average Rank"
