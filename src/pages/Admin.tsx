@@ -1709,27 +1709,23 @@ export default function Admin() {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {/* Bar Chart: Model Average Ratings */}
+                    {/* Bar Chart: Model Average Rankings */}
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
                       <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Model Performance Comparison</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ratings across all AI models</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Average ranking across all evaluations (lower is better)</p>
                       <ResponsiveContainer width="100%" height={400}>
                         <BarChart
                           data={(() => {
-                            const modelRatings: { [key: string]: { sum: number; count: number } } = {};
-                            analyticsData.allRatings?.forEach((rating: any) => {
-                              if (!modelRatings[rating.model_name]) {
-                                modelRatings[rating.model_name] = { sum: 0, count: 0 };
-                              }
-                              modelRatings[rating.model_name].sum += rating.rating || 0;
-                              modelRatings[rating.model_name].count += 1;
-                            });
-
-                            return Object.entries(modelRatings).map(([name, data]) => ({
-                              name: name.replace('models/', ''),
-                              'Average Rating': Number((data.sum / data.count).toFixed(2)),
-                              'Total Evaluations': data.count
-                            })).sort((a, b) => b['Average Rating'] - a['Average Rating']);
+                            return Object.values(analyticsData.modelStats)
+                              .map((model: any) => ({
+                                name: model.name.replace('models/', ''),
+                                'Average Rank': parseFloat(model.averageRank),
+                                'Total Evaluations': model.totalRatings,
+                                '1st Place': model.rankings[1],
+                                '2nd Place': model.rankings[2],
+                                '3rd Place': model.rankings[3]
+                              }))
+                              .sort((a, b) => a['Average Rank'] - b['Average Rank']);
                           })()}
                           margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                         >
@@ -1743,9 +1739,10 @@ export default function Admin() {
                             className="dark:fill-gray-400"
                           />
                           <YAxis
-                            domain={[0, 5]}
+                            domain={[0, 3]}
                             tick={{ fill: '#6b7280' }}
                             className="dark:fill-gray-400"
+                            label={{ value: 'Average Rank (lower = better)', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
                           />
                           <Tooltip
                             contentStyle={{
@@ -1756,7 +1753,7 @@ export default function Admin() {
                             }}
                           />
                           <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                          <Bar dataKey="Average Rating" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                          <Bar dataKey="Average Rank" fill="#4f46e5" radius={[8, 8, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1771,8 +1768,9 @@ export default function Admin() {
                             data={(() => {
                               const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
                               analyticsData.allRatings?.forEach((rating: any) => {
-                                if (rating.rank && rating.rank >= 1 && rating.rank <= 6) {
-                                  rankCounts[rating.rank]++;
+                                const score = rating.score;
+                                if (score && score >= 1 && score <= 6) {
+                                  rankCounts[score]++;
                                 }
                               });
 
@@ -1798,8 +1796,9 @@ export default function Admin() {
                             {(() => {
                               const rankCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
                               analyticsData.allRatings?.forEach((rating: any) => {
-                                if (rating.rank && rating.rank >= 1 && rating.rank <= 6) {
-                                  rankCounts[rating.rank]++;
+                                const score = rating.score;
+                                if (score && score >= 1 && score <= 6) {
+                                  rankCounts[score]++;
                                 }
                               });
 
@@ -1824,10 +1823,10 @@ export default function Admin() {
                       </ResponsiveContainer>
                     </div>
 
-                    {/* Line Chart: Ratings Over Time */}
+                    {/* Line Chart: Rankings Over Time */}
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800">
-                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Rating Trends Over Time</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily average ratings showing performance trends</p>
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Ranking Trends Over Time</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Daily average rankings showing performance trends (lower is better)</p>
                       <ResponsiveContainer width="100%" height={400}>
                         <LineChart
                           data={(() => {
@@ -1837,14 +1836,14 @@ export default function Admin() {
                               if (!dailyData[date]) {
                                 dailyData[date] = { sum: 0, count: 0 };
                               }
-                              dailyData[date].sum += rating.rating || 0;
+                              dailyData[date].sum += rating.score || 0;
                               dailyData[date].count += 1;
                             });
 
                             return Object.entries(dailyData)
                               .map(([date, data]) => ({
                                 date,
-                                'Average Rating': Number((data.sum / data.count).toFixed(2)),
+                                'Average Rank': Number((data.sum / data.count).toFixed(2)),
                                 'Evaluations': data.count
                               }))
                               .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -1859,9 +1858,10 @@ export default function Admin() {
                             className="dark:fill-gray-400"
                           />
                           <YAxis
-                            domain={[0, 5]}
+                            domain={[0, 3]}
                             tick={{ fill: '#6b7280' }}
                             className="dark:fill-gray-400"
+                            label={{ value: 'Average Rank (lower = better)', angle: -90, position: 'insideLeft', fill: '#6b7280' }}
                           />
                           <Tooltip
                             contentStyle={{
@@ -1874,7 +1874,7 @@ export default function Admin() {
                           <Legend wrapperStyle={{ paddingTop: '20px' }} />
                           <Line
                             type="monotone"
-                            dataKey="Average Rating"
+                            dataKey="Average Rank"
                             stroke="#4f46e5"
                             strokeWidth={3}
                             dot={{ fill: '#4f46e5', r: 4 }}
@@ -1891,17 +1891,18 @@ export default function Admin() {
                         <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{analyticsData.allRatings?.length || 0}</p>
                       </div>
                       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
-                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Average Rating</h5>
+                        <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Average Rank</h5>
                         <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                           {analyticsData.allRatings?.length > 0
-                            ? (analyticsData.allRatings.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / analyticsData.allRatings.length).toFixed(2)
+                            ? (analyticsData.allRatings.reduce((sum: number, r: any) => sum + (r.score || 0), 0) / analyticsData.allRatings.length).toFixed(2)
                             : '0.00'}
                         </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Lower is better</p>
                       </div>
                       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20">
                         <h5 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Active Models</h5>
                         <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
-                          {new Set(analyticsData.allRatings?.map((r: any) => r.model_name)).size}
+                          {new Set(analyticsData.allRatings?.map((r: any) => r.responses?.model_name).filter(Boolean)).size}
                         </p>
                       </div>
                     </div>
