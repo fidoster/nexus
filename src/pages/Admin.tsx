@@ -65,6 +65,10 @@ export default function Admin() {
   const [itemsPerPage, setItemsPerPage] = useState(50); // Increased from 10 to 50 for better performance
   const [totalRatings, setTotalRatings] = useState(0);
 
+  // Date range filtering state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   // Modal state
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
@@ -292,7 +296,8 @@ export default function Admin() {
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage - 1;
 
-      const { data: allRatings, error: ratingsError, count } = await supabase
+      // Build query with optional date filtering
+      let query = supabase
         .from('ratings')
         .select(`
           *,
@@ -306,7 +311,20 @@ export default function Admin() {
               user_id
             )
           )
-        `, { count: 'exact' }) // Get total count for pagination
+        `, { count: 'exact' }); // Get total count for pagination
+
+      // Apply date range filter if set
+      if (startDate) {
+        query = query.gte('created_at', new Date(startDate).toISOString());
+      }
+      if (endDate) {
+        // Add 1 day to include the entire end date
+        const endDateTime = new Date(endDate);
+        endDateTime.setDate(endDateTime.getDate() + 1);
+        query = query.lt('created_at', endDateTime.toISOString());
+      }
+
+      const { data: allRatings, error: ratingsError, count } = await query
         .range(startIndex, endIndex) // Apply pagination
         .order('created_at', { ascending: false });
 
@@ -386,7 +404,7 @@ export default function Admin() {
     if (activeTab === 'analytics' || activeTab === 'advanced-analytics') {
       loadAnalytics();
     }
-  }, [activeTab, currentPage, itemsPerPage]);
+  }, [activeTab, currentPage, itemsPerPage, startDate, endDate]);
 
   const exportToCSV = () => {
     if (!analyticsData?.allRatings) return;
@@ -1364,6 +1382,64 @@ export default function Admin() {
                     >
                       📥 Export CSV
                     </button>
+                  </div>
+                </div>
+
+                {/* Date Range Filter */}
+                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Date:</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="startDate" className="text-sm text-gray-600 dark:text-gray-400">From:</label>
+                      <input
+                        id="startDate"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          setCurrentPage(1); // Reset to first page when filtering
+                        }}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="endDate" className="text-sm text-gray-600 dark:text-gray-400">To:</label>
+                      <input
+                        id="endDate"
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value);
+                          setCurrentPage(1); // Reset to first page when filtering
+                        }}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      />
+                    </div>
+                    {(startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setStartDate('');
+                          setEndDate('');
+                          setCurrentPage(1);
+                        }}
+                        className="px-3 py-1.5 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Clear
+                      </button>
+                    )}
+                    {(startDate || endDate) && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {totalRatings} result{totalRatings !== 1 ? 's' : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
 

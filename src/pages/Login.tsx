@@ -159,14 +159,17 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-3">
           <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
             Don't have an account?{' '}
             <Link to="/signup" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-semibold">
               Sign Up
             </Link>
           </p>
-          <Link to="/" className="block mt-4 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm">
+          <Link to="/forgot-password" className="block text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm font-medium">
+            Forgot Password?
+          </Link>
+          <Link to="/" className="block text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-sm">
             Back to Home
           </Link>
         </div>
