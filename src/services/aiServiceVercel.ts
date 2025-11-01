@@ -30,8 +30,29 @@ export const generateAIResponses = async (query: string): Promise<AIResponse[]> 
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to generate responses');
+      // Try to get error details
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } else {
+        // HTML error page from Vercel
+        const errorText = await response.text();
+        console.error('Vercel returned HTML error:', errorText.substring(0, 500));
+        errorMessage = `Vercel error (${response.status}). Check function logs in Vercel Dashboard.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    // Parse JSON response
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      const text = await response.text();
+      console.error('Expected JSON but got:', text.substring(0, 500));
+      throw new Error('Server returned invalid response format. Check Vercel function logs.');
     }
 
     const data = await response.json();
