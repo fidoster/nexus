@@ -4,7 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
+import QueryHeatmap from '../components/QueryHeatmap';
 import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import { calculateChiSquare, calculateConfidenceInterval } from '../utils/statistics';
+import { calculateTotalCost, formatCost, MODEL_PRICING, estimateTokenCount } from '../utils/costCalculator';
+import { exportChartAsPNG } from '../utils/chartExport';
 
 interface UserProfile {
   id: string;
@@ -2550,6 +2554,271 @@ export default function Admin() {
                             return `${score}%`;
                           })()}
                         </p>
+                      </div>
+                    </div>
+
+                    {/* Statistical Significance Testing */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">📊 Statistical Significance Analysis</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Chi-square tests and confidence intervals for model performance</p>
+                        </div>
+                        <button
+                          onClick={() => exportChartAsPNG('statistical-analysis', 'statistical-analysis.png')}
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium flex items-center gap-2"
+                        >
+                          📥 Export
+                        </button>
+                      </div>
+
+                      <div id="statistical-analysis" className="space-y-6">
+                        {(() => {
+                          // Calculate observed vs expected frequencies
+                          const modelCounts: { [key: string]: number } = {};
+                          analyticsData.allRatings?.forEach((rating: any) => {
+                            const model = rating.responses?.model_name;
+                            if (model) {
+                              modelCounts[model] = (modelCounts[model] || 0) + 1;
+                            }
+                          });
+
+                          const observed = Object.values(modelCounts);
+                          const totalRatings = observed.reduce((sum, count) => sum + count, 0);
+                          const expected = observed.map(() => totalRatings / observed.length);
+
+                          let chiSquareResult;
+                          try {
+                            chiSquareResult = calculateChiSquare(observed, expected);
+                          } catch (error) {
+                            chiSquareResult = null;
+                          }
+
+                          // Calculate confidence intervals for each model's average rank
+                          const modelRanks: { [key: string]: number[] } = {};
+                          analyticsData.allRatings?.forEach((rating: any) => {
+                            const model = rating.responses?.model_name;
+                            if (model && rating.score) {
+                              if (!modelRanks[model]) modelRanks[model] = [];
+                              modelRanks[model].push(rating.score);
+                            }
+                          });
+
+                          return (
+                            <div className="space-y-6">
+                              {/* Chi-Square Test */}
+                              {chiSquareResult && (
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-4">
+                                  <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Chi-Square Test for Model Distribution</h5>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">χ² Statistic</div>
+                                      <div className="text-lg font-bold text-gray-900 dark:text-white">{chiSquareResult.chiSquare.toFixed(2)}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">p-value</div>
+                                      <div className="text-lg font-bold text-gray-900 dark:text-white">{chiSquareResult.pValue.toFixed(4)}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">Degrees of Freedom</div>
+                                      <div className="text-lg font-bold text-gray-900 dark:text-white">{chiSquareResult.degreesOfFreedom}</div>
+                                    </div>
+                                    <div>
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">Significance</div>
+                                      <div className={`text-lg font-bold ${chiSquareResult.significant ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                        {chiSquareResult.significant ? 'Yes (p < 0.05)' : 'No'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-3">
+                                    {chiSquareResult.significant
+                                      ? 'The distribution of ratings across models is statistically significant, indicating real performance differences.'
+                                      : 'No statistically significant difference in rating distribution across models.'}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Confidence Intervals */}
+                              <div>
+                                <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">95% Confidence Intervals for Average Rank</h5>
+                                <div className="space-y-3">
+                                  {Object.entries(modelRanks).map(([model, ranks]) => {
+                                    const ci = calculateConfidenceInterval(ranks, 0.95);
+                                    return (
+                                      <div key={model} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{model}</span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">n={ci.sampleSize}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">Mean:</span>
+                                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{ci.mean.toFixed(2)}</span>
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">CI:</span>
+                                          <span className="text-sm text-gray-700 dark:text-gray-300">[{ci.lower.toFixed(2)}, {ci.upper.toFixed(2)}]</span>
+                                        </div>
+                                        <div className="mt-2 relative h-2 bg-gray-200 dark:bg-gray-600 rounded-full">
+                                          <div
+                                            className="absolute h-2 bg-indigo-400 dark:bg-indigo-500 rounded-full"
+                                            style={{
+                                              left: `${Math.max(0, ((ci.lower - 1) / 2) * 100)}%`,
+                                              right: `${Math.max(0, (1 - (ci.upper - 1) / 2) * 100)}%`,
+                                            }}
+                                          ></div>
+                                          <div
+                                            className="absolute w-1 h-4 -mt-1 bg-indigo-600 dark:bg-indigo-400"
+                                            style={{ left: `${((ci.mean - 1) / 2) * 100}%` }}
+                                          ></div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* API Cost Tracking */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">💰 API Cost Analysis</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Estimated costs based on token usage and model pricing</p>
+                        </div>
+                        <button
+                          onClick={() => exportChartAsPNG('cost-analysis', 'cost-analysis.png')}
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium flex items-center gap-2"
+                        >
+                          📥 Export
+                        </button>
+                      </div>
+
+                      <div id="cost-analysis">
+                        {(() => {
+                          // Estimate token usage and calculate costs
+                          const costBreakdown: Array<{ modelName: string; inputTokens: number; outputTokens: number }> = [];
+
+                          analyticsData.allRatings?.forEach((rating: any) => {
+                            const modelName = rating.responses?.model_name;
+                            const queryContent = rating.responses?.queries?.content || '';
+                            const responseContent = rating.responses?.content || '';
+
+                            if (modelName && queryContent && responseContent) {
+                              costBreakdown.push({
+                                modelName,
+                                inputTokens: estimateTokenCount(queryContent),
+                                outputTokens: estimateTokenCount(responseContent),
+                              });
+                            }
+                          });
+
+                          const { totalCost, breakdown, totalTokens } = calculateTotalCost(costBreakdown);
+
+                          return (
+                            <div className="space-y-6">
+                              {/* Total Cost Summary */}
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg p-4">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Estimated Cost</div>
+                                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCost(totalCost)}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Based on current usage</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg p-4">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Input Tokens</div>
+                                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalTokens.input.toLocaleString()}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">User queries</div>
+                                </div>
+                                <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-4">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total Output Tokens</div>
+                                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalTokens.output.toLocaleString()}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">AI responses</div>
+                                </div>
+                              </div>
+
+                              {/* Cost by Model */}
+                              <div>
+                                <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Cost Breakdown by Model</h5>
+                                <div className="space-y-2">
+                                  {Object.entries(breakdown)
+                                    .sort(([, a], [, b]) => b - a)
+                                    .map(([model, cost]) => {
+                                      const percentage = (cost / totalCost) * 100;
+                                      return (
+                                        <div key={model} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{model}</span>
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCost(cost)}</span>
+                                          </div>
+                                          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                            <div
+                                              className="bg-green-600 dark:bg-green-500 h-2 rounded-full transition-all"
+                                              style={{ width: `${percentage}%` }}
+                                            ></div>
+                                          </div>
+                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{percentage.toFixed(1)}% of total</div>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+
+                              {/* Model Pricing Reference */}
+                              <div>
+                                <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Model Pricing (per 1M tokens)</h5>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {Object.entries(MODEL_PRICING).map(([model, pricing]) => (
+                                    <div key={model} className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-3 text-xs">
+                                      <div className="font-medium text-gray-700 dark:text-gray-300 mb-1">{model}</div>
+                                      <div className="text-gray-600 dark:text-gray-400">
+                                        Input: ${(pricing.input * 1000).toFixed(3)} | Output: ${(pricing.output * 1000).toFixed(3)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Query Activity Heatmap */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 shadow-lg">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">🗓️ Temporal Activity Analysis</h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Query submission patterns over time</p>
+                        </div>
+                        <button
+                          onClick={() => exportChartAsPNG('activity-heatmap', 'activity-heatmap.png')}
+                          className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium flex items-center gap-2"
+                        >
+                          📥 Export
+                        </button>
+                      </div>
+
+                      <div id="activity-heatmap">
+                        {(() => {
+                          // Group queries by date
+                          const dateCount: { [date: string]: number } = {};
+
+                          analyticsData.allRatings?.forEach((rating: any) => {
+                            const createdAt = rating.created_at || rating.responses?.queries?.created_at;
+                            if (createdAt) {
+                              const date = new Date(createdAt).toISOString().split('T')[0];
+                              dateCount[date] = (dateCount[date] || 0) + 1;
+                            }
+                          });
+
+                          const heatmapData = Object.entries(dateCount).map(([date, count]) => ({
+                            date,
+                            count,
+                          }));
+
+                          return <QueryHeatmap data={heatmapData} />;
+                        })()}
                       </div>
                     </div>
                   </div>
