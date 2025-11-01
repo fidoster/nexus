@@ -246,6 +246,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('🚀 Generate responses function invoked');
+
   try {
     // ⚡ RATE LIMITING - Prevent API abuse
     const identifier = getRateLimitIdentifier(req);
@@ -382,9 +384,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Wait for all API calls to complete
     const responses = await Promise.all(responsePromises);
 
+    console.log(`✅ Returning ${responses.length} responses`);
     return res.status(200).json({ responses });
   } catch (error: any) {
-    console.error('API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    console.error('❌ API error:', error);
+    console.error('Error stack:', error.stack);
+    return res.status(500).json({
+      error: error.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
