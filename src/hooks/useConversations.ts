@@ -20,7 +20,14 @@ interface Conversation {
 const fetchConversations = async (userId: string): Promise<Conversation[]> => {
   const { data, error } = await supabase
     .from('conversations')
-    .select('*')
+    .select(`
+      *,
+      queries (
+        id,
+        content,
+        created_at
+      )
+    `)
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
     .limit(20);
