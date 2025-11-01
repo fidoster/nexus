@@ -62,7 +62,8 @@ export default function Admin() {
 
   // Pagination state for Detailed Evaluation Records
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(50); // Increased from 10 to 50 for better performance
+  const [totalRatings, setTotalRatings] = useState(0);
 
   // Modal state
   const [modalConfig, setModalConfig] = useState<{
@@ -287,8 +288,11 @@ export default function Admin() {
   const loadAnalytics = async () => {
     setLoadingAnalytics(true);
     try {
-      // Fetch comprehensive analytics data
-      const { data: allRatings, error: ratingsError } = await supabase
+      // 🚀 PAGINATION: Fetch ratings with pagination for better performance
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage - 1;
+
+      const { data: allRatings, error: ratingsError, count } = await supabase
         .from('ratings')
         .select(`
           *,
@@ -302,10 +306,14 @@ export default function Admin() {
               user_id
             )
           )
-        `)
+        `, { count: 'exact' }) // Get total count for pagination
+        .range(startIndex, endIndex) // Apply pagination
         .order('created_at', { ascending: false });
 
       if (ratingsError) throw ratingsError;
+
+      // Store total count for pagination
+      setTotalRatings(count || 0);
 
       // Fetch user emails separately and map them
       const userIds = [...new Set(allRatings?.map((r: any) => r.responses?.queries?.user_id).filter(Boolean))];
@@ -372,6 +380,13 @@ export default function Admin() {
       setLoadingAnalytics(false);
     }
   };
+
+  // 🚀 Reload analytics when pagination changes or tab switches to analytics
+  useEffect(() => {
+    if (activeTab === 'analytics' || activeTab === 'advanced-analytics') {
+      loadAnalytics();
+    }
+  }, [activeTab, currentPage, itemsPerPage]);
 
   const exportToCSV = () => {
     if (!analyticsData?.allRatings) return;
@@ -1596,7 +1611,7 @@ export default function Admin() {
                               </select>
                             </div>
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, getSortedRatings().length)} to {Math.min(currentPage * itemsPerPage, getSortedRatings().length)} of {getSortedRatings().length} evaluations
+                              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalRatings)} to {Math.min(currentPage * itemsPerPage, totalRatings)} of {totalRatings} evaluations
                             </p>
                           </div>
 
@@ -1624,7 +1639,7 @@ export default function Admin() {
 
                             {/* Page Numbers */}
                             {(() => {
-                              const totalPages = Math.ceil(getSortedRatings().length / itemsPerPage);
+                              const totalPages = Math.ceil(totalRatings / itemsPerPage);
                               const pages: number[] = [];
 
                               if (totalPages <= 5) {

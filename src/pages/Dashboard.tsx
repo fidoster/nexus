@@ -15,6 +15,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
 import { generateAIResponses } from '../services/aiServiceVercel';
 import { sanitizeInput } from '../utils/sanitize';
+import { useConversations } from '../hooks/useConversations';
 
 interface Conversation {
   id: string;
@@ -54,11 +55,13 @@ export default function Dashboard() {
   const [queryText, setQueryText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [messageGroups, setMessageGroups] = useState<MessageGroup[]>([]); // All messages in current conversation
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [requireRating, setRequireRating] = useState(true);
   const [hasRated, setHasRated] = useState(false);
+
+  // 🚀 SWR: Automatic caching and revalidation for conversations
+  const { conversations, mutate: refreshConversations } = useConversations(user?.id);
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -85,28 +88,8 @@ export default function Dashboard() {
     setIsAdmin(profile?.role === 'admin');
   }, [user]);
 
-  const loadHistory = useCallback(async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        queries(*)
-      `)
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(20);
-    if (data) {
-      // Sort queries within each conversation by creation time
-      const conversationsWithSortedQueries = data.map(conv => ({
-        ...conv,
-        queries: conv.queries?.sort((a: Query, b: Query) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
-      }));
-      setConversations(conversationsWithSortedQueries as Conversation[]);
-    }
-  }, [user]);
+  // 🚀 SWR replaces loadHistory - conversations are automatically cached and updated
+  // refreshConversations() can be called to manually trigger a refresh
 
   const loadAppSettings = useCallback(async () => {
     try {
@@ -126,9 +109,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     checkAdminStatus();
-    loadHistory();
     loadAppSettings();
-  }, [checkAdminStatus, loadHistory, loadAppSettings]);
+    // SWR automatically loads and caches conversations
+  }, [checkAdminStatus, loadAppSettings]);
 
   const loadConversationMessages = async (conversationId: string) => {
     try {
@@ -276,7 +259,7 @@ export default function Dashboard() {
       if (error) throw error;
 
       setQueryText('');
-      loadHistory();
+      refreshConversations(); // 🚀 SWR: Refresh conversation list
 
       // Generate AI responses using real APIs or mock data
       try {
@@ -375,7 +358,7 @@ export default function Dashboard() {
           }
 
           // Reload the conversation list
-          await loadHistory();
+          refreshConversations(); // 🚀 SWR: Refresh conversation list
           console.log('✅ Conversation deleted successfully');
         } catch (err) {
           console.error('Error deleting conversation:', err);
@@ -504,13 +487,13 @@ export default function Dashboard() {
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase px-2 mb-2">
               Conversations
             </h3>
-            {conversations.length === 0 ? (
+            {!conversations || conversations.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-gray-500 px-2">No conversations yet</p>
             ) : (
               <div className="space-y-1">
                 {conversations.map((conversation) => {
-                  const firstQuery = conversation.queries?.[0];
-                  const messageCount = conversation.queries?.length || 0;
+                  const firstQuery = (conversation as any).queries?.[0];
+                  const messageCount = (conversation as any).queries?.length || 0;
                   // Use first query content as title, not the stored title field
                   const title = firstQuery?.content.slice(0, 50) || 'New Chat';
 
