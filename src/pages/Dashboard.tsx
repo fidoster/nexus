@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
 import { generateAIResponses } from '../services/aiServiceVercel';
+import { sanitizeInput } from '../utils/sanitize';
 
 interface Conversation {
   id: string;
@@ -206,6 +207,21 @@ export default function Dashboard() {
     e.preventDefault();
     if (!user || !queryText.trim()) return;
 
+    // Sanitize user input to prevent XSS
+    const sanitizedQuery = sanitizeInput(queryText.trim());
+
+    if (!sanitizedQuery) {
+      setModalConfig({
+        isOpen: true,
+        title: 'Invalid Input',
+        message: 'Please enter a valid question.',
+        type: 'error',
+        confirmText: 'OK',
+        onConfirm: undefined
+      });
+      return;
+    }
+
     // Check if rating is required and user hasn't rated yet
     if (requireRating && messageGroups.length > 0 && !hasRated) {
       setModalConfig({
@@ -229,7 +245,7 @@ export default function Dashboard() {
           .from('conversations')
           .insert([{
             user_id: user.id,
-            title: queryText.trim().slice(0, 50) // Use first 50 chars as title
+            title: sanitizedQuery.slice(0, 50) // Use first 50 chars as title
           }])
           .select()
           .single();
@@ -251,7 +267,7 @@ export default function Dashboard() {
         .insert([{
           user_id: user.id,
           conversation_id: conversationId,
-          content: queryText.trim(),
+          content: sanitizedQuery,
           status: 'pending'
         }])
         .select()
@@ -265,7 +281,7 @@ export default function Dashboard() {
       // Generate AI responses using real APIs or mock data
       try {
         console.log('🚀 Generating AI responses...');
-        const aiResponses = await generateAIResponses(queryText.trim());
+        const aiResponses = await generateAIResponses(sanitizedQuery);
         console.log('✅ Received responses:', aiResponses.length);
 
         // Save responses to database

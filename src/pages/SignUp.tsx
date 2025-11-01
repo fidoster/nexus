@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from '../components/ThemeToggle';
+import { validatePassword, getStrengthColor, type PasswordStrength } from '../utils/passwordValidation';
+import { sanitizeEmail } from '../utils/sanitize';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -11,6 +13,7 @@ export default function SignUp() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState<PasswordStrength | null>(null);
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -24,25 +27,47 @@ export default function SignUp() {
     };
   }, []);
 
+  // Validate password strength in real-time
+  useEffect(() => {
+    if (password) {
+      const strength = validatePassword(password, [email]);
+      setPasswordStrength(strength);
+    } else {
+      setPasswordStrength(null);
+    }
+  }, [password, email]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
+    // Validate email
+    let sanitizedEmail: string;
+    try {
+      sanitizedEmail = sanitizeEmail(email);
+    } catch (err) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    // Check passwords match
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    // Check password strength
+    const strength = validatePassword(password, [email]);
+    if (!strength.isValid) {
+      setError(strength.feedback.join(' '));
       return;
     }
 
     setLoading(true);
 
     try {
-      await signUp(email, password);
+      await signUp(sanitizedEmail, password);
       setSuccess('Account created! Please check your email to confirm your account. If you don\'t receive an email, check your spam folder or contact support.');
       // Don't navigate immediately - let user see the confirmation message
       // Clear any existing timeout before setting a new one
@@ -137,6 +162,26 @@ export default function SignUp() {
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               placeholder="••••••••"
             />
+            {passwordStrength && password && (
+              <div className="mt-2">
+                <div className="flex items-center gap-1 mb-1">
+                  <div className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${getStrengthColor(passwordStrength.score)}`}
+                      style={{ width: `${(passwordStrength.score + 1) * 20}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <p className={`text-xs ${passwordStrength.isValid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  {passwordStrength.feedback[0]}
+                </p>
+                {!passwordStrength.isValid && passwordStrength.feedback.length > 1 && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    {passwordStrength.feedback.slice(1).join(' ')}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
