@@ -336,8 +336,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const groqKey = process.env.GROQ_API_KEY;
     const perplexityKey = process.env.PERPLEXITY_API_KEY;
 
-    const responses: AIResponse[] = [];
-
     // All available models
     const allModels = [
       { name: 'GPT', key: openaiKey, call: callOpenAI },
