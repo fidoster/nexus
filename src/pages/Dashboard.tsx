@@ -14,6 +14,7 @@ import { supabase } from '../lib/supabase';
 import ThemeToggle from '../components/ThemeToggle';
 import Modal from '../components/Modal';
 import ConversationSearch from '../components/ConversationSearch';
+import NotificationCenter from '../components/NotificationCenter';
 import { generateAIResponses } from '../services/aiServiceVercel';
 import { sanitizeInput } from '../utils/sanitize';
 import { useConversations } from '../hooks/useConversations';
@@ -642,6 +643,7 @@ export default function Dashboard() {
             <div className="text-sm text-gray-600 dark:text-gray-400">
               {user?.email?.split('@')[0]}
             </div>
+            <NotificationCenter />
             <ThemeToggle />
           </div>
         </div>

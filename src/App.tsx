@@ -10,7 +10,9 @@ import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
+import Instructor from './pages/Instructor';
 import AccessDenied from './pages/AccessDenied';
+import SharedConversation from './pages/SharedConversation';
 
 function App() {
   return (
@@ -23,6 +25,7 @@ function App() {
           <Route path="/signup" element={<SignUp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/shared/:token" element={<SharedConversation />} />
           <Route path="/access-denied" element={<AccessDenied />} />
           <Route
             path="/profile"
@@ -45,6 +48,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Admin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/instructor"
+            element={
+              <ProtectedRoute>
+                <Instructor />
               </ProtectedRoute>
             }
           />
