@@ -27,10 +27,6 @@
     "api/generate-responses.ts": {
       "memory": 1024,
       "maxDuration": 60
-    },
-    "api/test-simple.ts": {
-      "memory": 512,
-      "maxDuration": 10
     }
   }
 }
