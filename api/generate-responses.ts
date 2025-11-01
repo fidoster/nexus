@@ -7,7 +7,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { aiRateLimiter, getRateLimitIdentifier, checkRateLimit } from './lib/ratelimit';
+// Temporarily disabled rate limiting to debug function crash
+// import { aiRateLimiter, getRateLimitIdentifier, checkRateLimit } from './lib/ratelimit';
 
 interface SystemPrompt {
   prompt_text: string;
@@ -249,27 +250,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('🚀 Generate responses function invoked');
 
   try {
-    // ⚡ RATE LIMITING - Prevent API abuse
-    const identifier = getRateLimitIdentifier(req);
-    const rateLimitResult = await checkRateLimit(aiRateLimiter, identifier);
-
-    if (rateLimitResult && !rateLimitResult.success) {
-      res.setHeader('X-RateLimit-Limit', rateLimitResult.limit.toString());
-      res.setHeader('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
-      res.setHeader('X-RateLimit-Reset', rateLimitResult.reset.toString());
-
-      return res.status(429).json({
-        error: 'Too many requests. Please try again later.',
-        retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000),
-      });
-    }
-
-    // Add rate limit headers to successful requests
-    if (rateLimitResult) {
-      res.setHeader('X-RateLimit-Limit', rateLimitResult.limit.toString());
-      res.setHeader('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
-      res.setHeader('X-RateLimit-Reset', rateLimitResult.reset.toString());
-    }
+    // ⚡ RATE LIMITING - Temporarily disabled for debugging
+    // const identifier = getRateLimitIdentifier(req);
+    // const rateLimitResult = await checkRateLimit(aiRateLimiter, identifier);
+    // ... rate limiting code removed temporarily ...
 
     const { query } = req.body;
 
